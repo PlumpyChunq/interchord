@@ -15,7 +15,7 @@ if (typeof cytoscape('core', 'dagre') === 'undefined') {
 }
 
 // Layout types available to users
-export type LayoutType = 'auto' | 'radial' | 'force' | 'hierarchical' | 'concentric';
+export type LayoutType = 'auto' | 'radial' | 'force' | 'hierarchical' | 'concentric' | 'spoke';
 
 interface ArtistGraphProps {
   graph: ArtistGraphType;
@@ -229,10 +229,17 @@ export function ArtistGraph({
   const [isLayouting, setIsLayouting] = useState(false);
   const [currentLayout, setCurrentLayout] = useState<LayoutType>(layoutType);
 
+  // Refs for callbacks to avoid re-initializing cytoscape when callbacks change
+  const onNodeClickRef = useRef(onNodeClick);
+  const onNodeExpandRef = useRef(onNodeExpand);
+  onNodeClickRef.current = onNodeClick;
+  onNodeExpandRef.current = onNodeExpand;
+
   // Layout display names for the dropdown
   const layoutOptions: { value: LayoutType; label: string }[] = [
     { value: 'auto', label: 'Auto (Depth-based)' },
-    { value: 'radial', label: 'Radial Spoke' },
+    { value: 'spoke', label: 'Spoke (Hub & Rings)' },
+    { value: 'radial', label: 'Radial Tree' },
     { value: 'force', label: 'Force-Directed' },
     { value: 'hierarchical', label: 'Hierarchical' },
     { value: 'concentric', label: 'Concentric Rings' },
@@ -308,8 +315,8 @@ export function ArtistGraph({
   // Determine effective layout based on 'auto' mode and network depth
   const getEffectiveLayout = useCallback((layout: LayoutType, depth: number): Exclude<LayoutType, 'auto'> => {
     if (layout !== 'auto') return layout;
-    // Auto mode: Force at depth 1, Radial at depth 2+
-    return depth === 1 ? 'force' : 'radial';
+    // Auto mode: Force at depth 1, Spoke at depth 2+
+    return depth === 1 ? 'force' : 'spoke';
   }, []);
 
   // Get layout options for the specified layout type
@@ -382,6 +389,67 @@ export function ArtistGraph({
           levelWidth: () => 1,
           spacingFactor: isLarge ? 1.2 : isMedium ? 1.5 : 1.75,
         } as unknown as cytoscape.LayoutOptions;
+
+      case 'spoke': {
+        // Custom spoke layout - hub with explicit rings based on BFS depth
+        // This creates the visual pattern: Core -> Members -> Members' other bands
+        const spokeDepths = cy ? calculateNodeDepths(cy) : new Map<string, number>();
+
+        // Group nodes by depth
+        const nodesByDepth = new Map<number, string[]>();
+        spokeDepths.forEach((depth, nodeId) => {
+          if (!nodesByDepth.has(depth)) {
+            nodesByDepth.set(depth, []);
+          }
+          nodesByDepth.get(depth)!.push(nodeId);
+        });
+
+        // Calculate positions for each node
+        const positions: Record<string, { x: number; y: number }> = {};
+        const containerWidth = containerRef.current?.clientWidth || 800;
+        const containerHeight = containerRef.current?.clientHeight || 600;
+        const centerX = containerWidth / 2;
+        const centerY = containerHeight / 2;
+
+        // Ring spacing - larger gaps for clearer visual separation
+        const ringSpacing = isLarge ? 100 : isMedium ? 130 : 160;
+
+        nodesByDepth.forEach((nodeIds, depth) => {
+          if (depth === 0) {
+            // Center node (hub)
+            nodeIds.forEach(id => {
+              positions[id] = { x: centerX, y: centerY };
+            });
+          } else {
+            // Arrange nodes in a circle at this depth
+            const radius = depth * ringSpacing;
+            const nodeCount = nodeIds.length;
+            const angleStep = (2 * Math.PI) / nodeCount;
+            const startAngle = -Math.PI / 2; // Start from top
+
+            nodeIds.forEach((id, index) => {
+              const angle = startAngle + (index * angleStep);
+              positions[id] = {
+                x: centerX + radius * Math.cos(angle),
+                y: centerY + radius * Math.sin(angle),
+              };
+            });
+          }
+        });
+
+        return {
+          name: 'preset',
+          positions: (node: NodeSingular) => {
+            const pos = positions[node.id()];
+            return pos || { x: centerX, y: centerY };
+          },
+          fit: true,
+          padding: 50,
+          animate: true,
+          animationDuration: 500,
+          animationEasing: 'ease-out',
+        } as unknown as cytoscape.LayoutOptions;
+      }
 
       case 'radial':
       default:
@@ -525,14 +593,14 @@ export function ArtistGraph({
       const node = event.target as NodeSingular;
       const nodeData = node.data();
 
-      if (onNodeClick) {
+      if (onNodeClickRef.current) {
         const artistNode: ArtistNode = {
           id: nodeData.id,
           name: nodeData.name,
           type: nodeData.type,
           loaded: nodeData.loaded === 'true',
         };
-        onNodeClick(artistNode);
+        onNodeClickRef.current(artistNode);
       }
     });
 
@@ -542,8 +610,18 @@ export function ArtistGraph({
       const node = event.target as NodeSingular;
       const nodeData = node.data();
 
-      if (nodeData.loaded === 'false' && onNodeExpand) {
-        onNodeExpand(nodeData.id);
+      if (nodeData.loaded === 'false' && onNodeExpandRef.current) {
+        onNodeExpandRef.current(nodeData.id);
+      }
+    });
+
+    // Background click to clear selection
+    cy.on('tap', (event) => {
+      if (isDestroyedRef.current) return;
+      // Only trigger if clicking on background (not a node or edge)
+      if (event.target === cy && onNodeClickRef.current) {
+        // Pass null to indicate background click (clear selection)
+        onNodeClickRef.current(null as unknown as ArtistNode);
       }
     });
 
@@ -568,7 +646,8 @@ export function ArtistGraph({
       }
       cyRef.current = null;
     };
-  }, [convertToElements, onNodeClick, onNodeExpand, getLayoutOptions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks use refs to avoid reinitializing
+  }, [convertToElements, getLayoutOptions]);
 
   // Update selection when selectedNodeId changes
   useEffect(() => {
@@ -597,6 +676,13 @@ export function ArtistGraph({
         // Dim all other nodes and edges
         cy.nodes().not(selectedNode).not(neighborNodes).addClass('dimmed');
         cy.edges().not(connectedEdges).addClass('dimmed');
+
+        // Auto-center on selected node with animation
+        cy.animate({
+          center: { eles: selectedNode },
+          duration: 300,
+          easing: 'ease-out',
+        });
       }
     }
   }, [selectedNodeId]);

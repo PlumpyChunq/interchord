@@ -25,7 +25,8 @@ const expansionDepthLabels: Record<ExpansionDepth, string> = {
   4: 'Level 4 - Three degrees (large graph)',
 };
 
-const relationshipLabels: Record<string, string> = {
+// Labels for when viewing a band/group
+const relationshipLabelsForGroup: Record<string, string> = {
   member_of: 'Members',
   founder_of: 'Founders',
   side_project: 'Side Projects',
@@ -35,6 +36,25 @@ const relationshipLabels: Record<string, string> = {
   same_scene: 'Same Scene',
   same_label: 'Same Label',
   touring_member: 'Touring Members',
+};
+
+// Labels for when viewing a person
+const relationshipLabelsForPerson: Record<string, string> = {
+  member_of: 'Bands & Groups',
+  founder_of: 'Founded',
+  side_project: 'Side Projects',
+  collaboration: 'Collaborations',
+  producer: 'Produced',
+  influenced_by: 'Influences',
+  same_scene: 'Same Scene',
+  same_label: 'Same Label',
+  touring_member: 'Touring For',
+};
+
+// Get appropriate labels based on artist type
+const getRelationshipLabel = (type: string, artistType: string): string => {
+  const labels = artistType === 'person' ? relationshipLabelsForPerson : relationshipLabelsForGroup;
+  return labels[type] || type;
 };
 
 interface GroupedItem {
@@ -366,20 +386,25 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   };
 
   // Handle node click - select/highlight that node in the graph
-  const handleNodeClick = (clickedArtist: ArtistNode) => {
+  const handleNodeClick = useCallback((clickedArtist: ArtistNode | null) => {
+    // If null (background click), clear selection
+    if (!clickedArtist) {
+      setSelectedNodeId(null);
+      return;
+    }
     // Toggle selection: if already selected, deselect; otherwise select
     setSelectedNodeId(prev => prev === clickedArtist.id ? null : clickedArtist.id);
-  };
+  }, []);
 
   // Handle sidebar click - select node in graph (single click)
-  const handleSidebarNodeSelect = (relatedArtist: ArtistNode) => {
+  const handleSidebarNodeSelect = useCallback((relatedArtist: ArtistNode) => {
     setSelectedNodeId(prev => prev === relatedArtist.id ? null : relatedArtist.id);
-  };
+  }, []);
 
   // Handle sidebar double-click - navigate to that artist
-  const handleSidebarNodeNavigate = (relatedArtist: ArtistNode) => {
+  const handleSidebarNodeNavigate = useCallback((relatedArtist: ArtistNode) => {
     onSelectRelated(relatedArtist);
-  };
+  }, [onSelectRelated]);
 
   // Handle node expansion
   const handleNodeExpand = useCallback(async (nodeId: string) => {
@@ -491,6 +516,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
             className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
           >
             <option value="auto">Auto</option>
+            <option value="spoke">Spoke</option>
             <option value="radial">Radial</option>
             <option value="force">Force</option>
             <option value="hierarchical">Tree</option>
@@ -575,7 +601,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
                 <Card key={type} className="text-sm">
                   <CardHeader className="py-2 px-3">
                     <CardTitle className="text-base">
-                      {relationshipLabels[type] || type}
+                      {getRelationshipLabel(type, artist.type)}
                       <span className="ml-1 text-xs font-normal text-gray-500">
                         ({items.length})
                       </span>
