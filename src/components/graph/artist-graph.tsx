@@ -102,28 +102,11 @@ const cytoscapeStyle: cytoscape.StylesheetStyle[] = [
       'background-opacity': 1,
     },
   },
-  // Highlighted edges (connected to selected node)
-  {
-    selector: 'edge.highlighted',
-    style: {
-      'width': 3,
-      'opacity': 1,
-      'line-color': '#f97316',
-      'target-arrow-color': '#f97316',
-    },
-  },
   // Dimmed nodes (not selected or connected)
   {
     selector: 'node.dimmed',
     style: {
       'opacity': 0.3,
-    },
-  },
-  // Dimmed edges (not connected to selected)
-  {
-    selector: 'edge.dimmed',
-    style: {
-      'opacity': 0.15,
     },
   },
   // Grabbed/dragging node
@@ -206,6 +189,24 @@ const cytoscapeStyle: cytoscape.StylesheetStyle[] = [
       'line-color': '#f9a8d4',
       'target-arrow-color': '#f9a8d4',
       'line-style': 'dashed',
+    },
+  },
+  // Highlighted edges (connected to selected node) - MUST come after type-specific styles
+  {
+    selector: 'edge.highlighted',
+    style: {
+      'width': 4,
+      'opacity': 1,
+      'line-color': '#ef4444',
+      'target-arrow-color': '#ef4444',
+      'z-index': 999,
+    },
+  },
+  // Dimmed edges (not connected to selected)
+  {
+    selector: 'edge.dimmed',
+    style: {
+      'opacity': 0.15,
     },
   },
 ];
@@ -677,12 +678,43 @@ export function ArtistGraph({
         cy.nodes().not(selectedNode).not(neighborNodes).addClass('dimmed');
         cy.edges().not(connectedEdges).addClass('dimmed');
 
-        // Auto-center on selected node with animation
-        cy.animate({
-          center: { eles: selectedNode },
-          duration: 300,
-          easing: 'ease-out',
-        });
+        // Check if this is the root node (main artist)
+        const isRootNode = selectedNode.data('root') === 'true';
+
+        if (isRootNode) {
+          // Fully center on root node when clicked
+          cy.animate({
+            center: { eles: selectedNode },
+            duration: 300,
+            easing: 'ease-out',
+          });
+        } else {
+          // Subtle pan towards selected node (only if it's far from center)
+          const nodePos = selectedNode.position();
+          const extent = cy.extent();
+          const viewCenterX = (extent.x1 + extent.x2) / 2;
+          const viewCenterY = (extent.y1 + extent.y2) / 2;
+          const viewWidth = extent.x2 - extent.x1;
+          const viewHeight = extent.y2 - extent.y1;
+
+          // Only nudge if node is in outer 40% of viewport
+          const distFromCenterX = Math.abs(nodePos.x - viewCenterX) / (viewWidth / 2);
+          const distFromCenterY = Math.abs(nodePos.y - viewCenterY) / (viewHeight / 2);
+
+          if (distFromCenterX > 0.6 || distFromCenterY > 0.6) {
+            // Pan 30% of the way toward the selected node
+            const newCenterX = viewCenterX + (nodePos.x - viewCenterX) * 0.3;
+            const newCenterY = viewCenterY + (nodePos.y - viewCenterY) * 0.3;
+            cy.animate({
+              pan: {
+                x: cy.pan().x - (newCenterX - viewCenterX) * cy.zoom(),
+                y: cy.pan().y - (newCenterY - viewCenterY) * cy.zoom(),
+              },
+              duration: 200,
+              easing: 'ease-out',
+            });
+          }
+        }
       }
     }
   }, [selectedNodeId]);

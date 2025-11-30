@@ -252,7 +252,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const [isExpanding, setIsExpanding] = useState(false);
   const [expandingNodeId, setExpandingNodeId] = useState<string | null>(null);
   const [autoExpandComplete, setAutoExpandComplete] = useState(false);
-  const [expansionDepth, setExpansionDepth] = useState<ExpansionDepth>(2);
+  const [expansionDepth, setExpansionDepth] = useState<ExpansionDepth>(1);
   const [expandProgress, setExpandProgress] = useState<{ current: number; total: number } | null>(null);
   const [showList, setShowList] = useState(true);
   const [isFav, setIsFav] = useState(false);
