@@ -816,6 +816,14 @@ export function ArtistGraph({
           <div className="w-4 h-0.5 bg-emerald-500 border-dashed" style={{ borderTopWidth: 2, borderTopStyle: 'dashed' }} />
           <span>Collaboration</span>
         </div>
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+          <div className="w-3 h-3 rounded-full border-2 border-red-500 border-dashed bg-red-50" />
+          <span>Selected</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 bg-red-500" style={{ height: 3 }} />
+          <span>Selected connection</span>
+        </div>
       </div>
 
       {/* Instructions */}

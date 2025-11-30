@@ -8,6 +8,7 @@ import { GraphView, LayoutType } from '@/components/graph';
 import { addToFavorites, removeFromFavorites, isFavorite } from '@/components/artist-search';
 import type { ArtistNode, ArtistRelationship, ArtistGraph } from '@/types';
 import { getArtistRelationships } from '@/lib/musicbrainz/client';
+import { UpcomingConcerts } from '@/components/upcoming-concerts';
 
 interface ArtistDetailProps {
   artist: ArtistNode;
@@ -591,6 +592,9 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
           {/* List Sidebar */}
           {showList && (
             <div className="w-72 flex-shrink-0 h-full overflow-y-auto space-y-2">
+              {/* Upcoming Concerts */}
+              <UpcomingConcerts artistName={artist.name} maxDisplay={5} />
+
               {Array.from(
                 groupRelationshipsByType(
                   data.relationships,
