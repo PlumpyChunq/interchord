@@ -93,6 +93,39 @@ const cytoscapeStyle: cytoscape.StylesheetStyle[] = [
       'background-color': '#fef2f2',
     },
   },
+  // Highlighted neighbor nodes (connected to selected)
+  {
+    selector: 'node.highlighted',
+    style: {
+      'border-color': '#f97316',
+      'border-width': 3,
+      'background-opacity': 1,
+    },
+  },
+  // Highlighted edges (connected to selected node)
+  {
+    selector: 'edge.highlighted',
+    style: {
+      'width': 3,
+      'opacity': 1,
+      'line-color': '#f97316',
+      'target-arrow-color': '#f97316',
+    },
+  },
+  // Dimmed nodes (not selected or connected)
+  {
+    selector: 'node.dimmed',
+    style: {
+      'opacity': 0.3,
+    },
+  },
+  // Dimmed edges (not connected to selected)
+  {
+    selector: 'edge.dimmed',
+    style: {
+      'opacity': 0.15,
+    },
+  },
   // Grabbed/dragging node
   {
     selector: 'node:grabbed',
@@ -541,9 +574,30 @@ export function ArtistGraph({
   useEffect(() => {
     if (!cyRef.current || isDestroyedRef.current) return;
 
-    cyRef.current.nodes().unselect();
+    const cy = cyRef.current;
+
+    // Clear all previous highlights
+    cy.nodes().unselect().removeClass('highlighted dimmed');
+    cy.edges().removeClass('highlighted dimmed');
+
     if (selectedNodeId) {
-      cyRef.current.$(`#${selectedNodeId}`).select();
+      const selectedNode = cy.$(`#${selectedNodeId}`);
+      if (selectedNode.length) {
+        // Select the node
+        selectedNode.select();
+
+        // Get connected edges and neighboring nodes
+        const connectedEdges = selectedNode.connectedEdges();
+        const neighborNodes = selectedNode.neighborhood('node');
+
+        // Highlight connected edges and neighbors
+        connectedEdges.addClass('highlighted');
+        neighborNodes.addClass('highlighted');
+
+        // Dim all other nodes and edges
+        cy.nodes().not(selectedNode).not(neighborNodes).addClass('dimmed');
+        cy.edges().not(connectedEdges).addClass('dimmed');
+      }
     }
   }, [selectedNodeId]);
 
@@ -646,36 +700,10 @@ export function ArtistGraph({
         </div>
       </div>
 
-      {/* Instructions and Layout Selector */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-lg shadow-sm text-xs text-gray-600 space-y-2">
+      {/* Instructions */}
+      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-lg shadow-sm text-xs text-gray-600">
         <p>Click node to select • Double-click to expand</p>
-        <p><strong>Drag nodes</strong> - connected nodes will follow</p>
-        <p>Scroll to zoom • Drag background to pan</p>
-
-        {/* Layout Selector */}
-        <div className="pt-2 border-t border-gray-200">
-          <label htmlFor="layout-select" className="block text-gray-700 font-medium mb-1">
-            Graph Layout
-          </label>
-          <select
-            id="layout-select"
-            value={currentLayout}
-            onChange={(e) => handleLayoutChange(e.target.value as LayoutType)}
-            disabled={isLayouting}
-            className="w-full px-2 py-1 text-xs border rounded bg-white text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {layoutOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {currentLayout === 'auto' && (
-            <p className="text-gray-500 mt-1 text-[10px]">
-              Force at depth 1, Radial at depth 2+
-            </p>
-          )}
-        </div>
+        <p>Drag nodes • Scroll to zoom • Drag to pan</p>
       </div>
 
       {/* Layout indicator */}

@@ -1,10 +1,9 @@
 'use client';
 
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import { Core } from 'cytoscape';
-import { ArtistGraph } from './artist-graph';
+import { ArtistGraph, LayoutType } from './artist-graph';
 import { GraphControls } from './graph-controls';
-import { Button } from '@/components/ui/button';
 import type { ArtistGraph as ArtistGraphType, ArtistNode } from '@/types';
 
 interface GraphViewProps {
@@ -13,6 +12,9 @@ interface GraphViewProps {
   onNodeClick?: (artist: ArtistNode) => void;
   onNodeExpand?: (artistId: string) => void;
   selectedNodeId?: string | null;
+  layoutType?: LayoutType;
+  networkDepth?: number;
+  onLayoutChange?: (layout: LayoutType) => void;
 }
 
 export function GraphView({
@@ -21,9 +23,11 @@ export function GraphView({
   onNodeClick,
   onNodeExpand,
   selectedNodeId,
+  layoutType = 'auto',
+  networkDepth = 1,
+  onLayoutChange,
 }: GraphViewProps) {
   const cyRef = useRef<Core | null>(null);
-  const [showGraph, setShowGraph] = useState(true);
 
   const handleZoomIn = useCallback(() => {
     if (cyRef.current) {
@@ -50,14 +54,6 @@ export function GraphView({
     }
   }, []);
 
-  if (!showGraph) {
-    return (
-      <div className="flex items-center justify-center h-[400px] bg-gray-50 rounded-lg border">
-        <Button onClick={() => setShowGraph(true)}>Show Graph View</Button>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[400px] bg-gray-50 rounded-lg border">
@@ -81,7 +77,7 @@ export function GraphView({
   }
 
   return (
-    <div className="relative h-[600px]">
+    <div className="relative h-full min-h-[500px]">
       <ArtistGraph
         graph={graph}
         onNodeClick={onNodeClick}
@@ -89,6 +85,9 @@ export function GraphView({
         selectedNodeId={selectedNodeId}
         className="h-full"
         cyRef={cyRef}
+        layoutType={layoutType}
+        networkDepth={networkDepth}
+        onLayoutChange={onLayoutChange}
       />
       <GraphControls
         onZoomIn={handleZoomIn}
@@ -96,17 +95,9 @@ export function GraphView({
         onFit={handleFit}
         onReset={handleReset}
       />
-      <Button
-        variant="outline"
-        size="sm"
-        className="absolute bottom-4 right-4"
-        onClick={() => setShowGraph(false)}
-      >
-        Hide Graph
-      </Button>
     </div>
   );
 }
 
-export { ArtistGraph } from './artist-graph';
+export { ArtistGraph, LayoutType } from './artist-graph';
 export { GraphControls } from './graph-controls';

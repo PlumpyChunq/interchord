@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useArtistRelationships } from '@/lib/musicbrainz/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraphView } from '@/components/graph';
+import { GraphView, LayoutType } from '@/components/graph';
 import { addToFavorites, removeFromFavorites, isFavorite } from '@/components/artist-search';
 import type { ArtistNode, ArtistRelationship, ArtistGraph } from '@/types';
 import { getArtistRelationships } from '@/lib/musicbrainz/client';
@@ -236,6 +236,8 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const [expandProgress, setExpandProgress] = useState<{ current: number; total: number } | null>(null);
   const [showList, setShowList] = useState(true);
   const [isFav, setIsFav] = useState(false);
+  const [layoutType, setLayoutType] = useState<LayoutType>('auto');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Check if artist is favorite on mount
   useEffect(() => {
@@ -363,11 +365,20 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     setExpandedGraph(null);
   };
 
-  // Handle node click - navigate to that artist
+  // Handle node click - select/highlight that node in the graph
   const handleNodeClick = (clickedArtist: ArtistNode) => {
-    if (clickedArtist.id !== artist.id) {
-      onSelectRelated(clickedArtist);
-    }
+    // Toggle selection: if already selected, deselect; otherwise select
+    setSelectedNodeId(prev => prev === clickedArtist.id ? null : clickedArtist.id);
+  };
+
+  // Handle sidebar click - select node in graph (single click)
+  const handleSidebarNodeSelect = (relatedArtist: ArtistNode) => {
+    setSelectedNodeId(prev => prev === relatedArtist.id ? null : relatedArtist.id);
+  };
+
+  // Handle sidebar double-click - navigate to that artist
+  const handleSidebarNodeNavigate = (relatedArtist: ArtistNode) => {
+    onSelectRelated(relatedArtist);
   };
 
   // Handle node expansion
@@ -418,66 +429,73 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
         ← Back to Search
       </Button>
 
-      {/* Artist Header */}
-      <Card>
-        <CardHeader className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleToggleFavorite}
-                className={`text-2xl transition-colors ${
-                  isFav ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'
-                }`}
-                title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                {isFav ? '★' : '☆'}
-              </button>
-              <div>
-                <CardTitle className="text-2xl">{artist.name}</CardTitle>
-                {artist.disambiguation && (
-                  <CardDescription className="text-base">{artist.disambiguation}</CardDescription>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                {artist.type}
-              </span>
-              {artist.country && (
-                <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
-                  {artist.country}
-                </span>
-              )}
-            </div>
+      {/* Artist Header - Compact */}
+      <div className="flex items-center justify-between bg-white p-3 rounded-lg border">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleFavorite}
+            className={`text-xl transition-colors ${
+              isFav ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'
+            }`}
+            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            {isFav ? '★' : '☆'}
+          </button>
+          <div>
+            <h1 className="text-xl font-bold">{artist.name}</h1>
+            {artist.disambiguation && (
+              <p className="text-sm text-gray-500">{artist.disambiguation}</p>
+            )}
           </div>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
           {artist.activeYears?.begin && (
-            <p className="text-sm text-gray-500">
-              Active: {artist.activeYears.begin}
-              {artist.activeYears.end ? ` – ${artist.activeYears.end}` : ' – present'}
-            </p>
+            <span className="text-gray-500">
+              {artist.activeYears.begin}{artist.activeYears.end ? `–${artist.activeYears.end}` : '–present'}
+            </span>
           )}
-        </CardHeader>
-      </Card>
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+            {artist.type}
+          </span>
+          {artist.country && (
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full">
+              {artist.country}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Controls Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-3 rounded-lg border">
-        <h2 className="text-lg font-semibold">Relationships</h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Network Depth:</label>
-            <select
-              value={expansionDepth}
-              onChange={(e) => handleDepthChange(Number(e.target.value) as ExpansionDepth)}
-              disabled={isExpanding}
-              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white disabled:opacity-50"
-              title={expansionDepthLabels[expansionDepth]}
-            >
-              <option value={1}>1 - Direct</option>
-              <option value={2}>2 - Members' bands</option>
-              <option value={3}>3 - Extended</option>
-              <option value={4}>4 - Full network</option>
-            </select>
-          </div>
+      <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-2 rounded-lg border">
+        <h2 className="text-base font-semibold">Relationships</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-sm text-gray-600">Network Depth:</label>
+          <select
+            value={expansionDepth}
+            onChange={(e) => handleDepthChange(Number(e.target.value) as ExpansionDepth)}
+            disabled={isExpanding}
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
+            title={expansionDepthLabels[expansionDepth]}
+          >
+            <option value={1}>1 - Direct</option>
+            <option value={2}>2 - Members&apos; bands</option>
+            <option value={3}>3 - Extended</option>
+            <option value={4}>4 - Full network</option>
+          </select>
+          <span className="text-gray-300">|</span>
+          <label className="text-sm text-gray-600">Layout:</label>
+          <select
+            value={layoutType}
+            onChange={(e) => setLayoutType(e.target.value as LayoutType)}
+            disabled={isExpanding}
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
+          >
+            <option value="auto">Auto</option>
+            <option value="radial">Radial</option>
+            <option value="force">Force</option>
+            <option value="hierarchical">Tree</option>
+            <option value="concentric">Concentric</option>
+          </select>
           {expandedGraph && (
             <Button variant="outline" size="sm" onClick={handleResetGraph} disabled={isExpanding}>
               Reset Graph
@@ -513,9 +531,9 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
       )}
 
       {data && data.relationships.length > 0 && (
-        <div className="flex gap-4">
+        <div className="flex gap-4" style={{ height: 'calc(100vh - 250px)', minHeight: '400px' }}>
           {/* Main Graph View */}
-          <div className={`relative flex-1 ${showList ? 'min-w-0' : ''}`}>
+          <div className={`relative flex-1 h-full ${showList ? 'min-w-0' : ''}`}>
             {isExpanding && (
               <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center rounded-lg">
                 <div className="bg-white px-4 py-3 rounded-lg shadow-lg text-center">
@@ -534,7 +552,10 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
               graph={graphData}
               onNodeClick={handleNodeClick}
               onNodeExpand={handleNodeExpand}
-              selectedNodeId={artist.id}
+              selectedNodeId={selectedNodeId}
+              layoutType={layoutType}
+              networkDepth={expansionDepth}
+              onLayoutChange={setLayoutType}
             />
             <div className="mt-2 text-center text-sm text-gray-500">
               {graphData.nodes.length} artists • {graphData.edges.length} connections
@@ -543,7 +564,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
 
           {/* List Sidebar */}
           {showList && (
-            <div className="w-80 flex-shrink-0 max-h-[600px] overflow-y-auto space-y-3">
+            <div className="w-72 flex-shrink-0 h-full overflow-y-auto space-y-2">
               {Array.from(
                 groupRelationshipsByType(
                   data.relationships,
@@ -565,8 +586,14 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
                       {items.map(({ relationship, artist: relatedArtist, isFoundingMember: founding, isCurrent, tenure }) => (
                         <div
                           key={relationship.id}
-                          className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50 cursor-pointer"
-                          onClick={() => onSelectRelated(relatedArtist)}
+                          className={`flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors ${
+                            selectedNodeId === relatedArtist.id
+                              ? 'bg-orange-100 hover:bg-orange-200'
+                              : 'hover:bg-gray-50'
+                          }`}
+                          onClick={() => handleSidebarNodeSelect(relatedArtist)}
+                          onDoubleClick={() => handleSidebarNodeNavigate(relatedArtist)}
+                          title="Click to highlight in graph, double-click to navigate"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1 flex-wrap">
