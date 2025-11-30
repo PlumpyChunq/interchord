@@ -165,6 +165,51 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [ ] Playlist creation/sync
 - [ ] Playback integration
 
+### Future: Band Timeline Component
+A horizontal timeline panel at the bottom of the artist detail page showing the band's history:
+
+#### Visual Design
+- Long horizontal scrollable timeline (full width at bottom of page)
+- Spans from band formation to present (or dissolution)
+- Interactive zoom/scroll for detailed exploration
+
+#### Timeline Events to Display
+- [ ] **Band Formation** - Start date with founding members
+- [ ] **Album Releases** - Major releases with cover art thumbnails
+- [ ] **Member Changes** - Joins, departures, lineup changes
+- [ ] **Pivotal Moments** - Major tours, breakthrough events
+- [ ] **Hiatus Periods** - Visual gaps or different styling
+- [ ] **Band End** - Dissolution date (if applicable)
+
+#### Data Sources
+- MusicBrainz: Formation dates, member tenure, release dates
+- Discogs: Album release dates, detailed discography
+- Wikidata: Major events, tours, awards
+- Wikipedia: Historical context (via Wikidata links)
+
+#### Technical Implementation
+- [ ] Research timeline visualization libraries (vis-timeline, react-chrono, etc.)
+- [ ] Aggregate event data from MusicBrainz releases + relationships
+- [ ] Design responsive horizontal scroll UI
+- [ ] Add event filtering (albums only, members only, etc.)
+- [ ] Sync timeline position with graph selection (click member → highlight tenure)
+
+#### Example: Butthole Surfers Timeline
+```
+1981 ─────── 1983 ─────── 1987 ─────── 1996 ─────── 2009 ───── Present
+  │            │            │            │            │
+  ▼            ▼            ▼            ▼            ▼
+Formation   Brown Reason  Locust      Electricl.  Touring
+            to Live       Abortion    Larryland   Resumes
+                          Tech.
+            ┌─────────────────────────────────────────────────────┐
+            │ Paul Leary (founding) ─────────────────────────────→│
+            │ Gibby Haynes (founding) ────────────────────────────→│
+            │ Teresa Taylor ─────────┤ (1983-1989)                 │
+            │ Jeff Pinkus ────────────────────────────────────────→│
+            └─────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Key Decisions Made
