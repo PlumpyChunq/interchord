@@ -16,7 +16,7 @@ import type {
 } from '@/types';
 
 const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'SmartAppleMusic/0.1.0 (https://github.com/jstone/smart-apple-music)';
+const USER_AGENT = 'InterChord/0.1.0 (https://github.com/jstone/interchord)';
 const RATE_LIMIT_MS = 1100; // 1.1 seconds between requests (safety margin)
 
 // Request queue for rate limiting

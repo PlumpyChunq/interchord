@@ -206,7 +206,7 @@ async function searchAppleMusicArtists(
 document.addEventListener('musickitloaded', async () => {
   await MusicKit.configure({
     developerToken: await fetchDeveloperToken(), // From your server
-    app: { name: 'Smart Apple Music', build: '1.0.0' },
+    app: { name: 'InterChord', build: '1.0.0' },
   });
 });
 
@@ -261,7 +261,7 @@ No API key required. **User-Agent header is mandatory:**
 
 ```typescript
 const headers = {
-  'User-Agent': 'SmartAppleMusic/1.0.0 (contact@example.com)',
+  'User-Agent': 'InterChord/1.0.0 (contact@example.com)',
   'Accept': 'application/json',
 };
 ```
@@ -510,7 +510,7 @@ Discogs excels at **discography data, label information, and artist aliases** wi
 ```typescript
 const headers = {
   'Authorization': `Discogs token=${process.env.DISCOGS_TOKEN}`,
-  'User-Agent': 'SmartAppleMusic/1.0.0',
+  'User-Agent': 'InterChord/1.0.0',
 };
 ```
 

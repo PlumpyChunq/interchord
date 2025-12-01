@@ -1,4 +1,4 @@
-# Smart Apple Music - Music Discovery & Artist Relationship Mapping
+# InterChord - The Music Web
 
 > **Last Updated:** 2025-12-01 | **Current Phase:** 3 - Extended Discovery
 
@@ -222,4 +222,4 @@ See `PROGRESS.md` for the complete roadmap (Phases 3-7). Key upcoming items:
 ## Development Notes
 
 - Use Playwright MCP for browser testing when needed
-- Confluence documentation: [Smart-Apple-Music Project](https://stonefrog.atlassian.net/wiki/spaces/STONEFROG/pages/1936752642)
+- Confluence documentation: [InterChord Project](https://stonefrog.atlassian.net/wiki/spaces/STONEFROG/pages/1936752642)

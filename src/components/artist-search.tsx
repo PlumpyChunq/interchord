@@ -9,8 +9,8 @@ import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
 import type { ArtistNode } from '@/types';
 
 // localStorage keys
-const RECENT_SEARCHES_KEY = 'smart-apple-music-recent-searches';
-const FAVORITES_KEY = 'smart-apple-music-favorites';
+const RECENT_SEARCHES_KEY = 'interchord-recent-searches';
+const FAVORITES_KEY = 'interchord-favorites';
 const MAX_RECENT_SEARCHES = 5;
 
 // Types for stored data

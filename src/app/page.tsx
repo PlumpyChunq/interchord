@@ -28,10 +28,10 @@ export default function Home() {
           </div>
           <div className="flex-1 text-center">
             <h1 className="text-3xl font-bold text-gray-900">
-              Smart Apple Music
+              InterChord
             </h1>
             <p className="text-sm text-gray-600">
-              Explore artist relationships and discover musical connections
+              The Music Web
             </p>
           </div>
           <div className="w-48 flex justify-end">

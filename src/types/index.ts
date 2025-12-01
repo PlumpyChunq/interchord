@@ -1,5 +1,5 @@
 /**
- * Core type definitions for Smart Apple Music
+ * Core type definitions for InterChord
  * Artist Relationship Graph MVP
  */
 

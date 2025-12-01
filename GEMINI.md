@@ -1,6 +1,6 @@
-# GEMINI Analysis & Strategy for Smart Apple Music
+# GEMINI Analysis & Strategy for InterChord
 
-> This document contains my analysis of the "Smart Apple Music" project as of 2025-11-30. It includes an assessment of the current state, code architecture, and a strategic path forward.
+> This document contains my analysis of the "InterChord" project as of 2025-11-30. It includes an assessment of the current state, code architecture, and a strategic path forward.
 
 ## 1. Project Analysis & Current State
 

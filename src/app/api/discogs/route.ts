@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   const headers = {
     'Authorization': `Discogs token=${DISCOGS_TOKEN}`,
-    'User-Agent': 'SmartAppleMusic/1.0',
+    'User-Agent': 'InterChord/1.0',
     'Accept': 'application/json',
   };
 

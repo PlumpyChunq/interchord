@@ -1,4 +1,4 @@
-# Smart Apple Music - Project Progress
+# InterChord - Project Progress
 
 > Last Updated: 2025-12-01
 

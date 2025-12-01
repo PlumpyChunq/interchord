@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Smart Apple Music - Artist Graph Explorer",
+  title: "InterChord - The Music Web",
   description: "Discover artist relationships and musical connections",
 };
 

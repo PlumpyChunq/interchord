@@ -1,6 +1,6 @@
 import type { MusicKitInstance } from './types';
 
-const APP_NAME = 'Smart Apple Music';
+const APP_NAME = 'InterChord';
 const APP_BUILD = '1.0.0';
 
 let musicKitInstance: MusicKitInstance | null = null;

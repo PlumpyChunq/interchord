@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArtistNode } from '@/types';
 
 // localStorage key
-export const FAVORITES_KEY = 'smart-apple-music-favorites';
+export const FAVORITES_KEY = 'interchord-favorites';
 
 // Type for stored artist data (minimal version of ArtistNode)
 export interface StoredArtist {
