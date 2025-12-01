@@ -13,14 +13,27 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Smart Apple Music
-          </h1>
-          <p className="text-lg text-gray-600">
-            Explore artist relationships and discover musical connections
-          </p>
+      <div className="container mx-auto px-4 py-3">
+        <header className="flex items-center mb-4">
+          <div className="w-32">
+            {selectedArtist && (
+              <button
+                onClick={() => setSelectedArtist(null)}
+                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              >
+                ← Back to Search
+              </button>
+            )}
+          </div>
+          <div className="flex-1 text-center">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Smart Apple Music
+            </h1>
+            <p className="text-sm text-gray-600">
+              Explore artist relationships and discover musical connections
+            </p>
+          </div>
+          <div className="w-32" />
         </header>
 
         {selectedArtist ? (

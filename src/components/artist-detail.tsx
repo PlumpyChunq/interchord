@@ -480,10 +480,6 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 pb-24">
-      <Button variant="outline" onClick={onBack} className="mb-4">
-        ← Back to Search
-      </Button>
-
       {/* Artist Header - Compact */}
       <div className="flex items-center justify-between bg-white p-3 rounded-lg border">
         <div className="flex items-center gap-2">
