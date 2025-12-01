@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import cytoscape, { Core, NodeSingular, Layouts } from 'cytoscape';
 import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
-import type { ArtistGraph as ArtistGraphType, ArtistNode } from '@/types';
+import type { ArtistGraph as ArtistGraphType, ArtistNode, RelationshipType } from '@/types';
+import type { GraphFilterState } from './graph-filters';
 
 // Register layout extensions
 if (typeof cytoscape('core', 'cola') === 'undefined') {
@@ -34,6 +35,7 @@ interface ArtistGraphProps {
   layoutType?: LayoutType;
   networkDepth?: number;
   onLayoutChange?: (layout: LayoutType) => void;
+  filters?: GraphFilterState;
 }
 
 // Cytoscape stylesheet
@@ -228,6 +230,7 @@ export function ArtistGraph({
   layoutType = 'auto',
   networkDepth = 1,
   onLayoutChange,
+  filters,
 }: ArtistGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalCyRef = useRef<Core | null>(null);
@@ -773,6 +776,71 @@ export function ArtistGraph({
     // Run layout with new nodes
     runLayout();
   }, [graph, convertToElements, runLayout]);
+
+  // Apply filters to show/hide nodes and edges
+  useEffect(() => {
+    if (!cyRef.current || isDestroyedRef.current || !filters) return;
+
+    const cy = cyRef.current;
+
+    // Reset all elements to visible first
+    cy.elements().removeClass('filtered');
+    cy.elements().style('display', 'element');
+
+    // Get the root node - always keep it visible
+    const rootNode = cy.$('node[root = "true"]');
+    const rootId = rootNode.id();
+
+    // Filter edges by relationship type
+    cy.edges().forEach(edge => {
+      const edgeType = edge.data('type') as RelationshipType;
+      if (!filters.relationshipTypes.has(edgeType)) {
+        edge.addClass('filtered');
+        edge.style('display', 'none');
+      }
+    });
+
+    // Filter edges by temporal (current vs all time)
+    if (filters.temporalFilter === 'current') {
+      cy.edges().forEach(edge => {
+        // Check if this edge has end date info in the original graph data
+        const edgeData = graph.edges.find(e => e.data.id === edge.id());
+        if (edgeData?.data.period?.end) {
+          edge.addClass('filtered');
+          edge.style('display', 'none');
+        }
+      });
+    }
+
+    // Filter nodes by type (person vs group)
+    cy.nodes().forEach(node => {
+      // Never filter the root node
+      if (node.id() === rootId) return;
+
+      const nodeType = node.data('type') as 'person' | 'group';
+      if (!filters.nodeTypes.has(nodeType)) {
+        node.addClass('filtered');
+        node.style('display', 'none');
+        // Also hide connected edges
+        node.connectedEdges().forEach(edge => {
+          edge.addClass('filtered');
+          edge.style('display', 'none');
+        });
+      }
+    });
+
+    // Hide orphan nodes (nodes with no visible edges, except root)
+    cy.nodes().forEach(node => {
+      if (node.id() === rootId) return;
+      if (node.hasClass('filtered')) return;
+
+      const visibleEdges = node.connectedEdges().filter(e => !e.hasClass('filtered'));
+      if (visibleEdges.length === 0) {
+        node.addClass('filtered');
+        node.style('display', 'none');
+      }
+    });
+  }, [filters, graph.edges]);
 
   return (
     <div className={`relative ${className}`}>

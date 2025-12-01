@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useArtistRelationships } from '@/lib/musicbrainz/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraphView, LayoutType } from '@/components/graph';
+import { GraphView, LayoutType, GraphFilters, getDefaultFilters, type GraphFilterState } from '@/components/graph';
 import { addToFavorites, removeFromFavorites, isFavorite } from '@/components/artist-search';
 import type { ArtistNode, ArtistRelationship, ArtistGraph } from '@/types';
 import { getArtistRelationships } from '@/lib/musicbrainz/client';
@@ -261,6 +261,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const [isFav, setIsFav] = useState(false);
   const [layoutType, setLayoutType] = useState<LayoutType>('auto');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [graphFilters, setGraphFilters] = useState<GraphFilterState>(getDefaultFilters);
 
   // Check if artist is favorite on mount
   useEffect(() => {
@@ -517,49 +518,61 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
       </div>
 
       {/* Controls Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2 bg-white p-2 rounded-lg border">
-        <h2 className="text-base font-semibold">Relationships</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-sm text-gray-600">Network Depth:</label>
-          <select
-            value={expansionDepth}
-            onChange={(e) => handleDepthChange(Number(e.target.value) as ExpansionDepth)}
-            disabled={isExpanding}
-            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
-            title={expansionDepthLabels[expansionDepth]}
-          >
-            <option value={1}>1 - Direct</option>
-            <option value={2}>2 - Members&apos; bands</option>
-            <option value={3}>3 - Extended</option>
-            <option value={4}>4 - Full network</option>
-          </select>
-          <span className="text-gray-300">|</span>
-          <label className="text-sm text-gray-600">Layout:</label>
-          <select
-            value={layoutType}
-            onChange={(e) => setLayoutType(e.target.value as LayoutType)}
-            disabled={isExpanding}
-            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
-          >
-            <option value="auto">Auto</option>
-            <option value="spoke">Spoke</option>
-            <option value="radial">Radial</option>
-            <option value="force">Force</option>
-            <option value="hierarchical">Tree</option>
-            <option value="concentric">Concentric</option>
-          </select>
-          {expandedGraph && (
-            <Button variant="outline" size="sm" onClick={handleResetGraph} disabled={isExpanding}>
-              Reset Graph
+      <div className="bg-white p-2 rounded-lg border space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-base font-semibold">Relationships</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm text-gray-600">Network Depth:</label>
+            <select
+              value={expansionDepth}
+              onChange={(e) => handleDepthChange(Number(e.target.value) as ExpansionDepth)}
+              disabled={isExpanding}
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
+              title={expansionDepthLabels[expansionDepth]}
+            >
+              <option value={1}>1 - Direct</option>
+              <option value={2}>2 - Members&apos; bands</option>
+              <option value={3}>3 - Extended</option>
+              <option value={4}>4 - Full network</option>
+            </select>
+            <span className="text-gray-300">|</span>
+            <label className="text-sm text-gray-600">Layout:</label>
+            <select
+              value={layoutType}
+              onChange={(e) => setLayoutType(e.target.value as LayoutType)}
+              disabled={isExpanding}
+              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50"
+            >
+              <option value="auto">Auto</option>
+              <option value="spoke">Spoke</option>
+              <option value="radial">Radial</option>
+              <option value="force">Force</option>
+              <option value="hierarchical">Tree</option>
+              <option value="concentric">Concentric</option>
+            </select>
+            {expandedGraph && (
+              <>
+                <span className="text-gray-300">|</span>
+                <Button variant="outline" size="sm" onClick={handleResetGraph} disabled={isExpanding}>
+                  Reset Graph
+                </Button>
+              </>
+            )}
+            <Button
+              variant={showList ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowList(!showList)}
+            >
+              {showList ? 'Hide List' : 'Show List'}
             </Button>
-          )}
-          <Button
-            variant={showList ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowList(!showList)}
-          >
-            {showList ? 'Hide List' : 'Show List'}
-          </Button>
+          </div>
+        </div>
+        <div className="border-t pt-2">
+          <GraphFilters
+            filters={graphFilters}
+            onFiltersChange={setGraphFilters}
+            compact
+          />
         </div>
       </div>
 
@@ -608,6 +621,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
               layoutType={layoutType}
               networkDepth={expansionDepth}
               onLayoutChange={setLayoutType}
+              filters={graphFilters}
             />
             <div className="mt-2 text-center text-sm text-gray-500">
               {graphData.nodes.length} artists • {graphData.edges.length} connections

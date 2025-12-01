@@ -5,6 +5,7 @@ import { Core } from 'cytoscape';
 import { ArtistGraph, LayoutType } from './artist-graph';
 import { GraphControls } from './graph-controls';
 import type { ArtistGraph as ArtistGraphType, ArtistNode } from '@/types';
+import type { GraphFilterState } from './graph-filters';
 
 interface GraphViewProps {
   graph: ArtistGraphType;
@@ -16,6 +17,7 @@ interface GraphViewProps {
   layoutType?: LayoutType;
   networkDepth?: number;
   onLayoutChange?: (layout: LayoutType) => void;
+  filters?: GraphFilterState;
 }
 
 export function GraphView({
@@ -27,6 +29,7 @@ export function GraphView({
   layoutType = 'auto',
   networkDepth = 1,
   onLayoutChange,
+  filters,
 }: GraphViewProps) {
   const cyRef = useRef<Core | null>(null);
 
@@ -89,6 +92,7 @@ export function GraphView({
         layoutType={layoutType}
         networkDepth={networkDepth}
         onLayoutChange={onLayoutChange}
+        filters={filters}
       />
       <GraphControls
         onZoomIn={handleZoomIn}
@@ -103,3 +107,5 @@ export function GraphView({
 export { ArtistGraph } from './artist-graph';
 export type { LayoutType } from './artist-graph';
 export { GraphControls } from './graph-controls';
+export { GraphFilters, getDefaultFilters } from './graph-filters';
+export type { GraphFilterState } from './graph-filters';
