@@ -106,6 +106,13 @@ export function GraphFilters({
       onFiltersChange(getDefaultFilters());
     };
 
+    // Check if current filters differ from defaults
+    const defaults = getDefaultFilters();
+    const isModified =
+      filters.temporalFilter !== defaults.temporalFilter ||
+      filters.relationshipTypes.size !== defaults.relationshipTypes.size ||
+      ![...filters.relationshipTypes].every(t => defaults.relationshipTypes.has(t));
+
     return (
       <div className="flex items-center gap-1 flex-wrap text-[10px]">
         {visibleTypes.map((type) => {
@@ -115,43 +122,63 @@ export function GraphFilters({
             <button
               key={type}
               onClick={() => handleRelTypeToggle(type)}
-              className={`flex items-center gap-1 px-1.5 py-px rounded border transition-all ${
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded border transition-all ${
                 isActive
-                  ? 'border-gray-200 bg-gray-50'
-                  : 'border-transparent opacity-40 hover:opacity-70 hover:border-gray-100'
+                  ? 'border-current'
+                  : 'border-transparent opacity-30 hover:opacity-60'
               }`}
+              style={isActive ? {
+                backgroundColor: `${config.color}20`,
+                borderColor: config.color,
+                color: config.color,
+              } : undefined}
               title={`${isActive ? 'Hide' : 'Show'} ${config.label} relationships`}
             >
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"
                 style={{ backgroundColor: config.color }}
               />
-              <span className="text-gray-600">{config.label}</span>
+              <span style={isActive ? { color: '#374151' } : undefined}>{config.label}</span>
             </button>
           );
         })}
         <span className="text-gray-200">|</span>
         <button
           onClick={() => handleTemporalChange(filters.temporalFilter === 'all' ? 'current' : 'all')}
-          className={`px-1.5 py-px rounded border transition-all ${
+          className={`px-1.5 py-0.5 rounded border transition-all ${
             filters.temporalFilter === 'current'
-              ? 'border-green-200 bg-green-50 text-green-700'
+              ? 'border-green-400 bg-green-100 text-green-700'
               : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-100'
           }`}
           title={filters.temporalFilter === 'current' ? 'Showing current members only' : 'Showing all members (past + present)'}
         >
           {filters.temporalFilter === 'current' ? 'Current' : 'All Time'}
         </button>
-        <button
-          onClick={handleReset}
-          className="px-1.5 py-px rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-          title="Reset filters to defaults"
-        >
-          Reset
-        </button>
+        {isModified && (
+          <button
+            onClick={handleReset}
+            className="px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+            title="Reset filters to defaults"
+          >
+            Reset
+          </button>
+        )}
       </div>
     );
   }
+
+  // Check if current filters differ from defaults for the reset button
+  const defaults = getDefaultFilters();
+  const isModified =
+    filters.temporalFilter !== defaults.temporalFilter ||
+    filters.relationshipTypes.size !== defaults.relationshipTypes.size ||
+    ![...filters.relationshipTypes].every(t => defaults.relationshipTypes.has(t)) ||
+    filters.nodeTypes.size !== defaults.nodeTypes.size ||
+    ![...filters.nodeTypes].every(t => defaults.nodeTypes.has(t));
+
+  const handleReset = () => {
+    onFiltersChange(getDefaultFilters());
+  };
 
   return (
     <div className="bg-white border rounded-lg p-3 space-y-3 text-sm">
@@ -182,9 +209,13 @@ export function GraphFilters({
             return (
               <label
                 key={type}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors ${
-                  isActive ? 'bg-gray-100' : 'hover:bg-gray-50'
+                className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors border ${
+                  isActive ? '' : 'border-transparent hover:bg-gray-50 opacity-50'
                 }`}
+                style={isActive ? {
+                  backgroundColor: `${config.color}20`,
+                  borderColor: config.color,
+                } : undefined}
               >
                 <input
                   type="checkbox"
@@ -193,9 +224,8 @@ export function GraphFilters({
                   className="sr-only"
                 />
                 <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    isActive ? config.color : 'bg-gray-300'
-                  }`}
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: isActive ? config.color : '#d1d5db' }}
                 />
                 <span className={isActive ? 'text-gray-900' : 'text-gray-400'}>
                   {config.label}
@@ -271,6 +301,18 @@ export function GraphFilters({
           </label>
         </div>
       </div>
+
+      {/* Reset Button */}
+      {isModified && (
+        <div className="border-t pt-3">
+          <button
+            onClick={handleReset}
+            className="w-full px-3 py-1.5 rounded border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-sm"
+          >
+            Reset All Filters
+          </button>
+        </div>
+      )}
     </div>
   );
 }
