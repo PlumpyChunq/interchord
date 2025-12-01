@@ -24,11 +24,13 @@ interface UseMultipleArtistsConcertsResult {
 
 /**
  * Hook to fetch concerts for an artist using TanStack Query
+ * @param artistName - The artist's name
+ * @param mbid - Optional MusicBrainz ID for exact matching
  */
-export function useArtistConcerts(artistName: string | null): UseArtistConcertsResult {
+export function useArtistConcerts(artistName: string | null, mbid?: string): UseArtistConcertsResult {
   const query = useQuery({
-    queryKey: ['artistConcerts', artistName],
-    queryFn: () => getArtistEvents(artistName!),
+    queryKey: ['artistConcerts', artistName, mbid],
+    queryFn: () => getArtistEvents(artistName!, mbid),
     enabled: !!artistName,
     staleTime: 30 * 60 * 1000, // 30 minutes - concert data is relatively stable
   });

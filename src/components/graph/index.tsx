@@ -12,6 +12,8 @@ interface GraphViewProps {
   /** Called when a node is clicked. Receives null when clicking the background to clear selection. */
   onNodeClick?: (artist: ArtistNode | null) => void;
   onNodeExpand?: (artistId: string) => void;
+  /** Called when hovering over a node in the graph. Receives null when mouse leaves. */
+  onNodeHover?: (artistId: string | null) => void;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
   layoutType?: LayoutType;
@@ -25,6 +27,7 @@ export function GraphView({
   isLoading,
   onNodeClick,
   onNodeExpand,
+  onNodeHover,
   selectedNodeId,
   hoveredNodeId,
   layoutType = 'auto',
@@ -62,6 +65,7 @@ export function GraphView({
         graph={graph}
         onNodeClick={onNodeClick}
         onNodeExpand={onNodeExpand}
+        onNodeHover={onNodeHover}
         selectedNodeId={selectedNodeId}
         hoveredNodeId={hoveredNodeId}
         className="h-full"

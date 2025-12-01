@@ -306,13 +306,23 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     relatedArtists: relatedArtistsMap,
   });
 
-  // Handle highlighting artists from timeline
+  // Handle highlighting artists from timeline click (selection)
   const handleTimelineHighlight = useCallback((artistIds: string[]) => {
     // Set the first related artist as selected in the graph
     if (artistIds.length > 0) {
       setSelectedNodeId(artistIds[0]);
     } else {
       setSelectedNodeId(null);
+    }
+  }, []);
+
+  // Handle highlighting artists from timeline hover (bi-directional highlighting)
+  const handleTimelineHover = useCallback((artistIds: string[]) => {
+    // Set the first related artist as hovered (for graph and sidebar highlighting)
+    if (artistIds.length > 0) {
+      setHoveredArtistId(artistIds[0]);
+    } else {
+      setHoveredArtistId(null);
     }
   }, []);
 
@@ -653,6 +663,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
                 graph={graphData}
                 onNodeClick={handleNodeClick}
                 onNodeExpand={handleNodeExpand}
+                onNodeHover={setHoveredArtistId}
                 selectedNodeId={selectedNodeId}
                 hoveredNodeId={hoveredArtistId}
                 layoutType={layoutType}
@@ -814,7 +825,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
               )}
 
               {/* Recent Shows at the bottom */}
-              <RecentConcerts artistName={artist.name} maxDisplay={5} />
+              <RecentConcerts artistName={artist.name} mbid={artist.id} maxDisplay={5} />
               </div>
             </ResizablePanel>
           )}
@@ -827,6 +838,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
         isLoading={isTimelineLoading}
         yearRange={yearRange}
         onHighlightArtists={handleTimelineHighlight}
+        onHoverArtists={handleTimelineHover}
         highlightedAlbum={highlightedAlbum}
         highlightedArtistIds={hoveredArtistId ? [hoveredArtistId] : undefined}
         onHeightChange={setTimelineHeight}

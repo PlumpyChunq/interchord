@@ -44,11 +44,16 @@ export interface Concert {
 
 /**
  * Fetch recent shows for an artist via our API route (avoids CORS)
+ * @param artistName - The artist's name
+ * @param mbid - Optional MusicBrainz ID for exact matching (prevents "Ween" returning "Helloween")
  */
-export async function getArtistEvents(artistName: string): Promise<Concert[]> {
+export async function getArtistEvents(artistName: string, mbid?: string): Promise<Concert[]> {
   try {
     const encodedName = encodeURIComponent(artistName);
-    const url = `/api/concerts?artist=${encodedName}`;
+    let url = `/api/concerts?artist=${encodedName}`;
+    if (mbid) {
+      url += `&mbid=${encodeURIComponent(mbid)}`;
+    }
 
     const response = await fetch(url);
 

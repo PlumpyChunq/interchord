@@ -29,6 +29,8 @@ interface ArtistGraphProps {
   /** Called when a node is clicked. Receives null when clicking the background to clear selection. */
   onNodeClick?: (artist: ArtistNode | null) => void;
   onNodeExpand?: (artistId: string) => void;
+  /** Called when hovering over a node in the graph. Receives null when mouse leaves. */
+  onNodeHover?: (artistId: string | null) => void;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
   className?: string;
@@ -240,6 +242,7 @@ export function ArtistGraph({
   graph,
   onNodeClick,
   onNodeExpand,
+  onNodeHover,
   selectedNodeId,
   hoveredNodeId,
   className = '',
@@ -266,8 +269,10 @@ export function ArtistGraph({
    */
   const onNodeClickRef = useRef(onNodeClick);
   const onNodeExpandRef = useRef(onNodeExpand);
+  const onNodeHoverRef = useRef(onNodeHover);
   onNodeClickRef.current = onNodeClick;
   onNodeExpandRef.current = onNodeExpand;
+  onNodeHoverRef.current = onNodeHover;
 
   // Layout display names for the dropdown
   const layoutOptions: { value: LayoutType; label: string }[] = [
@@ -669,6 +674,23 @@ export function ArtistGraph({
       // Only trigger if clicking on background (not a node or edge)
       if (event.target === cy && onNodeClickRef.current) {
         onNodeClickRef.current(null);
+      }
+    });
+
+    // Node hover handlers for bi-directional highlighting
+    cy.on('mouseover', 'node', (event) => {
+      if (isDestroyedRef.current) return;
+      const node = event.target as NodeSingular;
+      const nodeData = node.data();
+      if (onNodeHoverRef.current) {
+        onNodeHoverRef.current(nodeData.id);
+      }
+    });
+
+    cy.on('mouseout', 'node', () => {
+      if (isDestroyedRef.current) return;
+      if (onNodeHoverRef.current) {
+        onNodeHoverRef.current(null);
       }
     });
 

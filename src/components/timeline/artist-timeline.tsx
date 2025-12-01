@@ -9,7 +9,10 @@ interface ArtistTimelineProps {
   events: TimelineEvent[];
   isLoading: boolean;
   yearRange: { min: number; max: number } | null;
+  /** Called when clicking a timeline event (for selection) */
   onHighlightArtists?: (artistIds: string[]) => void;
+  /** Called when hovering over a timeline event (for bi-directional highlighting) */
+  onHoverArtists?: (artistIds: string[]) => void;
   highlightedAlbum?: { name: string; year: number } | null;
   highlightedArtistIds?: string[];
   onHeightChange?: (height: number) => void;
@@ -55,6 +58,7 @@ export function ArtistTimeline({
   isLoading,
   yearRange,
   onHighlightArtists,
+  onHoverArtists,
   highlightedAlbum,
   highlightedArtistIds,
   onHeightChange,
@@ -218,6 +222,7 @@ export function ArtistTimeline({
                       year={year}
                       events={eventsByYear.get(year) || []}
                       onEventClick={handleEventClick}
+                      onEventHover={onHoverArtists}
                       highlightedAlbum={highlightedAlbum}
                       highlightedArtistIds={highlightedArtistIds}
                     />
@@ -277,11 +282,12 @@ interface EventColumnProps {
   year: number;
   events: TimelineEvent[];
   onEventClick: (event: TimelineEvent, e: React.MouseEvent) => void;
+  onEventHover?: (artistIds: string[]) => void;
   highlightedAlbum?: { name: string; year: number } | null;
   highlightedArtistIds?: string[];
 }
 
-function EventColumn({ year, events, onEventClick, highlightedAlbum, highlightedArtistIds }: EventColumnProps) {
+function EventColumn({ year, events, onEventClick, onEventHover, highlightedAlbum, highlightedArtistIds }: EventColumnProps) {
   const hasEvents = events.length > 0;
 
   return (
@@ -308,6 +314,7 @@ function EventColumn({ year, events, onEventClick, highlightedAlbum, highlighted
                 key={event.id}
                 event={event}
                 onClick={onEventClick}
+                onHover={onEventHover}
                 isHighlighted={isAlbumHighlighted || isArtistHighlighted}
               />
             );
@@ -326,10 +333,11 @@ function EventColumn({ year, events, onEventClick, highlightedAlbum, highlighted
 interface EventDotProps {
   event: TimelineEvent;
   onClick: (event: TimelineEvent, e: React.MouseEvent) => void;
+  onHover?: (artistIds: string[]) => void;
   isHighlighted?: boolean;
 }
 
-function EventDot({ event, onClick, isHighlighted }: EventDotProps) {
+function EventDot({ event, onClick, onHover, isHighlighted }: EventDotProps) {
   const colors = EVENT_COLORS[event.type];
   const icon = EVENT_ICONS[event.type];
   const isAlbum = event.type === 'album';
@@ -372,12 +380,20 @@ function EventDot({ event, onClick, isHighlighted }: EventDotProps) {
         y: rect.top - 8,
       });
     }
-  }, []);
+    // Trigger hover highlight in graph and sidebar
+    if (onHover && event.relatedArtistIds?.length) {
+      onHover(event.relatedArtistIds);
+    }
+  }, [onHover, event.relatedArtistIds]);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
     setTooltipPos(null);
-  }, []);
+    // Clear hover highlight
+    if (onHover) {
+      onHover([]);
+    }
+  }, [onHover]);
 
   return (
     <div className="relative">

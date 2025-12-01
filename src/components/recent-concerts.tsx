@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface RecentShowsProps {
   artistName: string;
+  /** MusicBrainz ID for exact matching (prevents "Ween" returning "Helloween") */
+  mbid?: string;
   maxDisplay?: number;
 }
 
-export function RecentConcerts({ artistName, maxDisplay = 5 }: RecentShowsProps) {
-  const { concerts, isLoading, error, recentCount } = useArtistConcerts(artistName);
+export function RecentConcerts({ artistName, mbid, maxDisplay = 5 }: RecentShowsProps) {
+  const { concerts, isLoading, error, recentCount } = useArtistConcerts(artistName, mbid);
 
   if (isLoading) {
     return (
