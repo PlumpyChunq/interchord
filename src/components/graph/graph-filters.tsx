@@ -161,6 +161,13 @@ export function GraphFilters({
         >
           All
         </button>
+        <button
+          onClick={handleSelectNone}
+          className="px-1.5 py-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          title="Clear all filters (keeps only Member)"
+        >
+          Clear
+        </button>
         {isModified && (
           <button
             onClick={handleReset}
