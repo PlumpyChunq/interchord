@@ -349,6 +349,17 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   // Use expanded graph if available, otherwise initial
   const graphData = expandedGraph || initialGraphData;
 
+  // Compute available relationship types from current graph edges
+  const availableRelTypes = useMemo(() => {
+    const types = new Set<string>();
+    graphData.edges.forEach(edge => {
+      if (edge.data.type) {
+        types.add(edge.data.type);
+      }
+    });
+    return Array.from(types);
+  }, [graphData.edges]);
+
   // Multi-level expansion function
   const performMultiLevelExpansion = useCallback(async (depth: ExpansionDepth) => {
     if (!data || isExpanding) return;
@@ -613,6 +624,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
           <GraphFilters
             filters={graphFilters}
             onFiltersChange={setGraphFilters}
+            availableTypes={availableRelTypes as import('@/types').RelationshipType[]}
             compact
           />
         </div>
