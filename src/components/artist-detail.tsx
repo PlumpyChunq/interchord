@@ -141,10 +141,16 @@ function groupRelationshipsByType(
         grouped.set(type, []);
       }
 
-      const startYear = parseYear(rel.period?.begin) ?? 9999;
+      // Use relationship period if available, otherwise fall back to related artist's active years
+      // This helps when MusicBrainz has dates on the band but not on the membership relationship
+      const periodBegin = rel.period?.begin || artist.activeYears?.begin;
+      // Use nullish coalescing - fall back to artist's activeYears if relationship period.end is null/undefined
+      const periodEnd = rel.period?.end ?? artist.activeYears?.end;
+
+      const startYear = parseYear(periodBegin) ?? 9999;
       const founding = isFoundingMember(rel, earliestYear);
-      const isCurrent = !rel.period?.end;
-      const tenure = formatTenure(rel.period?.begin, rel.period?.end);
+      const isCurrent = periodEnd === null || periodEnd === undefined;
+      const tenure = formatTenure(periodBegin, periodEnd);
 
       grouped.get(type)!.push({
         relationship: rel,
@@ -196,6 +202,9 @@ function buildGraphData(
     }
   }
 
+  // Create artist lookup for fallback period data
+  const artistMap = new Map(relatedArtists.map(a => [a.id, a]));
+
   const nodes: ArtistGraph['nodes'] = [
     {
       data: {
@@ -213,9 +222,26 @@ function buildGraphData(
     })),
   ];
 
-  const edges: ArtistGraph['edges'] = relationships.map(rel => ({
-    data: rel,
-  }));
+  // Enrich edges with fallback period from related artist's activeYears
+  const edges: ArtistGraph['edges'] = relationships.map(rel => {
+    const relatedId = rel.target !== centerArtist.id ? rel.target : rel.source;
+    const relatedArtist = artistMap.get(relatedId);
+
+    // Use relationship period if available, otherwise fall back to related artist's active years
+    const periodBegin = rel.period?.begin || relatedArtist?.activeYears?.begin;
+    // Use nullish coalescing - fall back to artist's activeYears if relationship period.end is null/undefined
+    const periodEnd = rel.period?.end ?? relatedArtist?.activeYears?.end;
+
+    return {
+      data: {
+        ...rel,
+        period: {
+          begin: periodBegin,
+          end: periodEnd,
+        },
+      },
+    };
+  });
 
   return { nodes, edges };
 }
@@ -268,7 +294,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredArtistId, setHoveredArtistId] = useState<string | null>(null);
   const [graphFilters, setGraphFilters] = useState<GraphFilterState>(getDefaultFilters);
-  const [highlightedAlbum, setHighlightedAlbum] = useState<{ name: string; year: number } | null>(null);
+  const [highlightedAlbum, setHighlightedAlbum] = useState<{ name: string; year: number; source: 'timeline' | 'sidebar' } | null>(null);
   const [timelineHeight, setTimelineHeight] = useState(TIMELINE_DEFAULT_HEIGHT);
 
   // Check if artist is favorite on mount
@@ -334,10 +360,10 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     }
   }, []);
 
-  // Handle highlighting album from sidebar (for timeline)
-  const onHighlightAlbum = useCallback((albumName: string | null, year: number | null) => {
+  // Handle highlighting album (from timeline or sidebar)
+  const onHighlightAlbum = useCallback((albumName: string | null, year: number | null, source: 'timeline' | 'sidebar' = 'sidebar') => {
     if (albumName && year) {
-      setHighlightedAlbum({ name: albumName, year });
+      setHighlightedAlbum({ name: albumName, year, source });
     } else {
       setHighlightedAlbum(null);
     }

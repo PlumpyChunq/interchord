@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ArtistSearch } from '@/components/artist-search';
 import { ArtistDetail } from '@/components/artist-detail';
 import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
-import { AppleMusicAuth } from '@/components/apple-music-auth';
+import { SettingsDropdown } from '@/components/settings-dropdown';
 import { useFavorites } from '@/lib/favorites';
 import type { ArtistNode } from '@/types';
 
@@ -35,7 +35,7 @@ export default function Home() {
             </p>
           </div>
           <div className="w-48 flex justify-end">
-            <AppleMusicAuth />
+            <SettingsDropdown />
           </div>
         </header>
 

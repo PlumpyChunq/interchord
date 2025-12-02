@@ -12,6 +12,8 @@ export interface StoredArtist {
   name: string;
   type: string;
   country?: string;
+  genres?: string[];  // Genre categories from MusicBrainz tags
+  overrideGenre?: string;  // User-assigned genre (takes precedence over auto-detected)
 }
 
 interface UseFavoritesResult {
@@ -19,6 +21,7 @@ interface UseFavoritesResult {
   favoriteNames: string[];
   addFavorite: (artist: ArtistNode | StoredArtist) => void;
   removeFavorite: (artistId: string) => void;
+  updateArtistGenre: (artistId: string, genre: string | null) => void;
   isFavorite: (artistId: string) => boolean;
   isLoaded: boolean;
 }
@@ -92,6 +95,7 @@ export function useFavorites(): UseFavoritesResult {
       name: artist.name,
       type: artist.type,
       country: artist.country,
+      genres: 'genres' in artist ? artist.genres : undefined,
     };
 
     setFavorites((prev) => {
@@ -102,8 +106,8 @@ export function useFavorites(): UseFavoritesResult {
       const updated = [...prev, stored];
       try {
         localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-        // Dispatch custom event for same-tab updates
-        window.dispatchEvent(new Event('favorites-updated'));
+        // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
+        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
       } catch {
         // Ignore storage errors
       }
@@ -117,8 +121,31 @@ export function useFavorites(): UseFavoritesResult {
       const updated = prev.filter((f) => f.id !== artistId);
       try {
         localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-        // Dispatch custom event for same-tab updates
-        window.dispatchEvent(new Event('favorites-updated'));
+        // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
+        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
+      } catch {
+        // Ignore storage errors
+      }
+      return updated;
+    });
+  }, []);
+
+  // Update an artist's genre assignment (for drag-and-drop between sections)
+  const updateArtistGenre = useCallback((artistId: string, genre: string | null) => {
+    setFavorites((prev) => {
+      const updated = prev.map((f) => {
+        if (f.id === artistId) {
+          return {
+            ...f,
+            overrideGenre: genre || undefined,
+          };
+        }
+        return f;
+      });
+      try {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+        // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
+        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
       } catch {
         // Ignore storage errors
       }
@@ -143,6 +170,7 @@ export function useFavorites(): UseFavoritesResult {
     favoriteNames,
     addFavorite,
     removeFavorite,
+    updateArtistGenre,
     isFavorite,
     isLoaded,
   };

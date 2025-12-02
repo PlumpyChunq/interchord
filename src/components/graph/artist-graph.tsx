@@ -8,6 +8,17 @@ import type { ArtistGraph as ArtistGraphType, ArtistNode, RelationshipType } fro
 import type { GraphFilterState } from './graph-filters';
 import { parseYear } from '@/lib/utils';
 
+// Format tenure as years only (e.g., "1987–1994" or "2000–present")
+function formatTenure(begin?: string, end?: string | null): string {
+  const startYear = parseYear(begin);
+  if (!startYear) return '';
+  const endYear = parseYear(end);
+  if (endYear) {
+    return startYear === endYear ? String(startYear) : `${startYear}–${endYear}`;
+  }
+  return `${startYear}–`;
+}
+
 // Register layout extensions
 if (typeof cytoscape('core', 'cola') === 'undefined') {
   cytoscape.use(cola);
@@ -178,6 +189,11 @@ const cytoscapeStyle = [
       'arrow-scale': 0.8,
       'curve-style': 'bezier',
       'opacity': 0.6,
+      'label': '',  // No label by default
+      'font-size': 9,
+      'text-background-color': '#ffffff',
+      'text-background-opacity': 0.9,
+      'text-background-padding': 2,
     },
   },
   // Edge colors by type
@@ -228,6 +244,15 @@ const cytoscapeStyle = [
       'line-color': '#ef4444',
       'target-arrow-color': '#ef4444',
       'z-index': 999,
+      'label': 'data(tenure)',
+      'font-size': 10,
+      'font-weight': 600,
+      'color': '#374151',
+      'text-background-color': '#ffffff',
+      'text-background-opacity': 0.95,
+      'text-background-padding': 3,
+      'text-background-shape': 'roundrectangle',
+      'text-margin-y': -10,
     },
   },
   // Dimmed edges (not connected to selected)
@@ -308,6 +333,7 @@ export function ArtistGraph({
         source: edge.data.source,
         target: edge.data.target,
         type: edge.data.type,
+        tenure: formatTenure(edge.data.period?.begin, edge.data.period?.end),
       },
     }));
 

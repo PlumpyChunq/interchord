@@ -151,6 +151,7 @@ export async function getArtistLifeSpan(mbid: string): Promise<{ begin?: string;
 
 /**
  * Get artist relationships (band members, collaborations, etc.)
+ * Also fetches life-span data for group-type related artists to enable tenure display
  */
 export async function getArtistRelationships(mbid: string): Promise<{
   artist: ArtistNode;
@@ -167,6 +168,7 @@ export async function getArtistRelationships(mbid: string): Promise<{
   const relationships: ArtistRelationship[] = [];
   const relatedArtists: ArtistNode[] = [];
   const seenArtists = new Set<string>();
+  const groupsToFetch: ArtistNode[] = [];
 
   if (artist.relations) {
     for (const relation of artist.relations) {
@@ -176,11 +178,25 @@ export async function getArtistRelationships(mbid: string): Promise<{
         const relatedNode = mapMusicBrainzArtistToNode(relation.artist);
         relatedArtists.push(relatedNode);
 
+        // Track groups that need life-span data (for tenure display)
+        if (relatedNode.type === 'group' && !relatedNode.activeYears?.begin) {
+          groupsToFetch.push(relatedNode);
+        }
+
         const edge = mapRelationToEdge(mbid, relation);
         if (edge) {
           relationships.push(edge);
         }
       }
+    }
+  }
+
+  // Fetch life-span for groups (bands) to enable tenure display
+  // This adds extra API calls but provides valuable data
+  for (const group of groupsToFetch) {
+    const lifeSpan = await getArtistLifeSpan(group.id);
+    if (lifeSpan) {
+      group.activeYears = lifeSpan;
     }
   }
 
@@ -249,6 +265,65 @@ export async function getArtistReleaseGroups(
 }
 
 // ============================================================================
+// Genre Mapping
+// ============================================================================
+
+// Map MusicBrainz tags to broader genre categories
+// More specific categories are listed first to catch them before broader ones
+const GENRE_CATEGORIES: Record<string, string[]> = {
+  // More specific genres first (order matters for matching)
+  'Punk/Hardcore': ['punk', 'hardcore', 'post-hardcore', 'hardcore punk', 'punk rock', 'emo', 'screamo', 'melodic hardcore', 'straight edge', 'crust punk', 'anarcho-punk', 'pop punk', 'skate punk', 'oi!', 'street punk', 'd-beat'],
+  'Metal': ['metal', 'heavy metal', 'thrash metal', 'death metal', 'black metal', 'doom metal', 'power metal', 'progressive metal', 'metalcore', 'nu metal', 'sludge metal', 'stoner metal', 'grindcore', 'deathcore'],
+  'Indie/Alternative': ['indie', 'indie rock', 'alternative', 'alternative rock', 'post-punk', 'shoegaze', 'lo-fi', 'math rock', 'noise rock', 'post-rock', 'dream pop', 'slowcore', 'sadcore', 'jangle pop', 'college rock', 'c86'],
+  'Rock': ['rock', 'hard rock', 'progressive rock', 'classic rock', 'psychedelic rock', 'art rock', 'glam rock', 'soft rock', 'garage rock', 'southern rock', 'blues rock', 'roots rock', 'heartland rock'],
+  'Grunge': ['grunge', 'seattle sound'],
+  'New Wave': ['new wave', 'synthpop', 'post-punk revival', 'dark wave', 'coldwave', 'minimal wave', 'no wave'],
+  'Jazz': ['jazz', 'bebop', 'swing', 'fusion', 'smooth jazz', 'free jazz', 'jazz fusion', 'big band', 'cool jazz', 'avant-garde jazz', 'modal jazz', 'jazz funk'],
+  'Electronic': ['electronic', 'house', 'techno', 'ambient', 'edm', 'trance', 'drum and bass', 'dubstep', 'idm', 'electro', 'synthwave', 'downtempo', 'trip hop', 'breakbeat', 'uk garage', 'jungle'],
+  'Classical': ['classical', 'orchestra', 'chamber', 'symphony', 'opera', 'baroque', 'romantic', 'contemporary classical', 'minimalist', 'neo-classical', 'choral'],
+  'Hip-Hop': ['hip hop', 'rap', 'hip-hop', 'trap', 'gangsta rap', 'conscious hip hop', 'alternative hip hop', 'east coast hip hop', 'west coast hip hop', 'southern hip hop', 'boom bap'],
+  'R&B/Soul': ['r&b', 'soul', 'funk', 'motown', 'rhythm and blues', 'neo-soul', 'contemporary r&b', 'gospel', 'disco', 'quiet storm', 'new jack swing'],
+  'Folk/Country': ['folk', 'country', 'bluegrass', 'americana', 'singer-songwriter', 'folk rock', 'country rock', 'alt-country', 'traditional folk', 'acoustic', 'outlaw country', 'honky tonk', 'progressive country'],
+  'Pop': ['pop', 'synth-pop', 'dance-pop', 'electropop', 'art pop', 'indie pop', 'pop rock', 'teen pop', 'power pop', 'baroque pop', 'chamber pop', 'sunshine pop'],
+  'World': ['world', 'latin', 'reggae', 'afrobeat', 'bossa nova', 'salsa', 'ska', 'dub', 'world music', 'african', 'celtic', 'flamenco', 'brazilian', 'cumbia', 'tropicalia', 'highlife'],
+  'Blues': ['blues', 'delta blues', 'chicago blues', 'electric blues', 'country blues', 'texas blues', 'jump blues'],
+  'Experimental': ['experimental', 'avant-garde', 'noise', 'industrial', 'krautrock', 'musique concrète', 'drone', 'dark ambient', 'power electronics'],
+};
+
+/**
+ * Map MusicBrainz tags to genre categories
+ * Returns top matching categories sorted by tag relevance
+ */
+function mapTagsToGenres(tags: Array<{ name: string; count: number }> | undefined): string[] | undefined {
+  if (!tags || tags.length === 0) return undefined;
+
+  // Score each category based on matching tags
+  const categoryScores: Record<string, number> = {};
+
+  // Sort tags by count (most relevant first)
+  const sortedTags = [...tags].sort((a, b) => b.count - a.count);
+
+  for (const tag of sortedTags) {
+    const tagLower = tag.name.toLowerCase();
+
+    for (const [category, categoryTags] of Object.entries(GENRE_CATEGORIES)) {
+      if (categoryTags.some(ct => tagLower.includes(ct) || ct.includes(tagLower))) {
+        // Weight by tag count
+        categoryScores[category] = (categoryScores[category] || 0) + tag.count;
+      }
+    }
+  }
+
+  // Return top 3 categories sorted by score
+  const sortedCategories = Object.entries(categoryScores)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([category]) => category);
+
+  return sortedCategories.length > 0 ? sortedCategories : undefined;
+}
+
+// ============================================================================
 // Mapping Functions
 // ============================================================================
 
@@ -263,6 +338,7 @@ function mapMusicBrainzArtistToNode(artist: MusicBrainzArtist): ArtistNode {
       begin: artist['life-span'].begin,
       end: artist['life-span'].ended ? artist['life-span'].end : null,
     } : undefined,
+    genres: mapTagsToGenres(artist.tags),
     loaded: false,
   };
 }

@@ -33,6 +33,7 @@ export interface ArtistNode {
   loaded?: boolean;              // Has this node been expanded?
   founding?: boolean;            // Is this a founding member? (for graph styling)
   instruments?: string[];        // Top instruments/roles (vocals, guitar, drums, etc.)
+  genres?: string[];             // Top MusicBrainz tags mapped to genre categories
 }
 
 /**

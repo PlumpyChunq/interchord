@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
-import { SpotifyAuth } from '@/components/spotify-auth';
-import { AppleMusicAuth } from '@/components/apple-music-auth';
+import { FavoritesByGenre } from '@/components/favorites-by-genre';
 import type { ArtistNode } from '@/types';
 
 // localStorage keys
@@ -21,6 +20,8 @@ interface StoredArtist {
   name: string;
   type: string;
   country?: string;
+  genres?: string[];
+  overrideGenre?: string;
 }
 
 interface ArtistSearchProps {
@@ -152,6 +153,25 @@ export function ArtistSearch({ onSelectArtist }: ArtistSearchProps) {
     }
   }, []);
 
+  // Update an artist's genre assignment (for drag-and-drop between sections)
+  const updateArtistGenre = useCallback((artistId: string, genre: string) => {
+    setFavorites((prev) => {
+      const updated = prev.map((f) => {
+        if (f.id === artistId) {
+          return { ...f, overrideGenre: genre };
+        }
+        return f;
+      });
+      try {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new Event('favorites-updated'));
+      } catch {
+        // Ignore storage errors
+      }
+      return updated;
+    });
+  }, []);
+
   // Extract artist names for the concerts hook
   const favoriteArtistNames = useMemo(
     () => favorites.map((f) => f.name),
@@ -174,36 +194,13 @@ export function ArtistSearch({ onSelectArtist }: ArtistSearchProps) {
         </Button>
       </div>
 
-      {/* Music Service Connections */}
-      <div className="space-y-2">
-        <span className="text-xs text-gray-500 font-medium">Import from Music Services</span>
-        <div className="flex flex-wrap gap-2">
-          <SpotifyAuth />
-          <AppleMusicAuth />
-        </div>
-      </div>
-
-      {/* Favorites Section */}
+      {/* Favorites Section - Grouped by Genre */}
       {favorites.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-600 font-medium">Favorites</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {favorites.map((artist) => (
-              <Button
-                key={artist.id}
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickSelect(artist)}
-                className="text-xs border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700"
-              >
-                <span className="mr-1">&#9733;</span>
-                {artist.name}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <FavoritesByGenre
+          favorites={favorites}
+          onSelectArtist={handleQuickSelect}
+          onUpdateArtistGenre={updateArtistGenre}
+        />
       )}
 
       {/* Recent Searches Section */}
@@ -309,6 +306,7 @@ export function addToFavorites(artist: ArtistNode | StoredArtist): void {
       name: artist.name,
       type: artist.type,
       country: 'country' in artist ? artist.country : undefined,
+      genres: 'genres' in artist ? artist.genres : undefined,
     };
 
     // Don't add if already exists

@@ -14,7 +14,7 @@ interface ArtistTimelineProps {
   /** Called when hovering over a timeline event (for bi-directional highlighting) */
   onHoverArtists?: (artistIds: string[]) => void;
   /** Called when hovering over an album event (for bi-directional highlighting with sidebar) */
-  onHoverAlbum?: (albumName: string | null, year: number | null) => void;
+  onHoverAlbum?: (albumName: string | null, year: number | null, source?: 'timeline' | 'sidebar') => void;
   highlightedAlbum?: { name: string; year: number } | null;
   highlightedArtistIds?: string[];
   onHeightChange?: (height: number) => void;
@@ -29,7 +29,7 @@ export const TIMELINE_DEFAULT_HEIGHT = 112;
 const EVENT_COLORS: Record<TimelineEventType, { bg: string; border: string; text: string }> = {
   album: { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-700' },
   concert: { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-700' },
-  birth: { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-700' },
+  birth: { bg: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-700' },
   formation: { bg: 'bg-green-100', border: 'border-green-500', text: 'text-green-700' },
   disbanded: { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-700' },
   member_join: { bg: 'bg-emerald-100', border: 'border-emerald-400', text: 'text-emerald-700' },
@@ -347,7 +347,7 @@ interface EventColumnProps {
   events: TimelineEvent[];
   onEventClick: (event: TimelineEvent, e: React.MouseEvent) => void;
   onEventHover?: (artistIds: string[]) => void;
-  onHoverAlbum?: (albumName: string | null, year: number | null) => void;
+  onHoverAlbum?: (albumName: string | null, year: number | null, source?: 'timeline' | 'sidebar') => void;
   highlightedAlbum?: { name: string; year: number } | null;
   highlightedArtistIds?: string[];
   isInFilterRange: boolean;
@@ -412,7 +412,7 @@ interface EventDotProps {
   event: TimelineEvent;
   onClick: (event: TimelineEvent, e: React.MouseEvent) => void;
   onHover?: (artistIds: string[]) => void;
-  onHoverAlbum?: (albumName: string | null, year: number | null) => void;
+  onHoverAlbum?: (albumName: string | null, year: number | null, source?: 'timeline' | 'sidebar') => void;
   isHighlighted?: boolean;
 }
 
@@ -465,7 +465,7 @@ function EventDot({ event, onClick, onHover, onHoverAlbum, isHighlighted }: Even
     }
     // Trigger album highlight for bi-directional highlighting with sidebar
     if (onHoverAlbum && event.type === 'album') {
-      onHoverAlbum(event.title, event.year);
+      onHoverAlbum(event.title, event.year, 'timeline');
     }
   }, [onHover, onHoverAlbum, event.relatedArtistIds, event.type, event.title, event.year]);
 
@@ -478,7 +478,7 @@ function EventDot({ event, onClick, onHover, onHoverAlbum, isHighlighted }: Even
     }
     // Clear album highlight
     if (onHoverAlbum) {
-      onHoverAlbum(null, null);
+      onHoverAlbum(null, null, 'timeline');
     }
   }, [onHover, onHoverAlbum]);
 
@@ -548,6 +548,7 @@ function LegendItem({ type }: { type: TimelineEventType }) {
   const labels: Record<TimelineEventType, string> = {
     album: 'Album',
     concert: 'Show',
+    birth: 'Born',
     formation: 'Formed',
     disbanded: 'Ended',
     member_join: 'Joined',
