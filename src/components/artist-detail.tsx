@@ -11,6 +11,7 @@ import type { ArtistNode, ArtistRelationship, ArtistGraph } from '@/types';
 import { getArtistRelationships } from '@/lib/musicbrainz/client';
 import { useArtistTimeline } from '@/lib/timeline';
 import { ArtistTimeline, TIMELINE_DEFAULT_HEIGHT } from '@/components/timeline';
+import { useArtistBio } from '@/lib/wikipedia';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { parseYear } from '@/lib/utils';
 
@@ -291,6 +292,11 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const { data: enrichedArtist } = useEnrichedArtist(artist);
   const displayArtist = enrichedArtist || artist;
 
+  // Fetch artist bio from Wikipedia
+  const { bio, wikipediaUrl, isLoading: isBioLoading } = useArtistBio({
+    artistName: artist.name,
+  });
+
   // Build map of related artists for timeline
   const relatedArtistsMap = useMemo(() => {
     if (!data) return new Map<string, ArtistNode>();
@@ -523,8 +529,9 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   return (
     <div className="w-full px-4 flex flex-col h-[calc(100vh-80px)]" style={{ paddingBottom: timelineHeight + 16 }}>
       {/* Artist Header - Compact */}
-      <div className="flex items-center justify-between bg-white p-3 rounded-lg border shrink-0 mb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 bg-white p-3 rounded-lg border shrink-0 mb-4">
+        {/* Left: Image, Star, Name */}
+        <div className="flex items-center gap-3 shrink-0">
           {/* Artist Image from Apple Music */}
           {displayArtist.imageUrl ? (
             <img
@@ -555,7 +562,30 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+
+        {/* Center: Bio */}
+        <div className="flex-1 min-w-0 px-4">
+          {isBioLoading ? (
+            <p className="text-sm text-gray-400 italic">Loading bio...</p>
+          ) : bio ? (
+            <p className="text-sm text-gray-600 line-clamp-4">
+              {bio}
+              {wikipediaUrl && (
+                <a
+                  href={wikipediaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700 ml-1"
+                >
+                  Wikipedia
+                </a>
+              )}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Right: Badges */}
+        <div className="flex items-center gap-2 text-sm shrink-0">
           {artist.activeYears?.begin && (
             <span className="text-gray-500">
               {artist.activeYears.begin}{artist.activeYears.end ? `–${artist.activeYears.end}` : '–present'}

@@ -12,6 +12,7 @@ interface TimelineEventPopupProps {
 const EVENT_LABELS: Record<TimelineEventType, string> = {
   album: 'Album Release',
   concert: 'Concert',
+  birth: 'Born',
   formation: 'Formation',
   disbanded: 'Disbanded',
   member_join: 'Member Joined',
@@ -22,6 +23,7 @@ const EVENT_LABELS: Record<TimelineEventType, string> = {
 const EVENT_COLORS: Record<TimelineEventType, string> = {
   album: 'text-purple-600',
   concert: 'text-blue-600',
+  birth: 'text-pink-600',
   formation: 'text-green-600',
   disbanded: 'text-red-600',
   member_join: 'text-emerald-600',

@@ -116,32 +116,63 @@ function releaseGroupsToEvents(
 }
 
 /**
- * Extract formation/dissolution events from artist node
+ * Extract formation/birth/dissolution events from artist node
+ * For persons: activeYears.begin = birth date, activeYears.end = death date
+ * For groups: activeYears.begin = formation date, activeYears.end = disbanded date
  */
-function getLifecycleEvents(artist: ArtistNode): TimelineEvent[] {
+function getLifecycleEvents(artist: ArtistNode, firstAlbumYear?: number): TimelineEvent[] {
   const events: TimelineEvent[] = [];
+  const isPerson = artist.type === 'person';
 
   if (artist.activeYears?.begin) {
     const date = parseMusicBrainzDate(artist.activeYears.begin);
     if (date) {
-      events.push({
-        id: `formation-${artist.id}`,
-        date,
-        year: date.getFullYear(),
-        type: artist.type === 'group' ? 'formation' : 'formation',
-        title: artist.type === 'group' ? `${artist.name} Formed` : `${artist.name} Career Began`,
-        subtitle: artist.country || undefined,
-        externalUrl: `https://musicbrainz.org/artist/${artist.id}`,
-        artistName: artist.name,
-      });
+      if (isPerson) {
+        // For persons, this is their birth date
+        events.push({
+          id: `birth-${artist.id}`,
+          date,
+          year: date.getFullYear(),
+          type: 'birth',
+          title: `${artist.name} Born`,
+          subtitle: artist.country || undefined,
+          externalUrl: `https://musicbrainz.org/artist/${artist.id}`,
+          artistName: artist.name,
+        });
+      } else {
+        // For groups, this is their formation date
+        events.push({
+          id: `formation-${artist.id}`,
+          date,
+          year: date.getFullYear(),
+          type: 'formation',
+          title: `${artist.name} Formed`,
+          subtitle: artist.country || undefined,
+          externalUrl: `https://musicbrainz.org/artist/${artist.id}`,
+          artistName: artist.name,
+        });
+      }
     }
+  }
+
+  // For persons, add a "career began" event based on first album release
+  if (isPerson && firstAlbumYear) {
+    const careerDate = new Date(firstAlbumYear, 0, 1);
+    events.push({
+      id: `career-${artist.id}`,
+      date: careerDate,
+      year: firstAlbumYear,
+      type: 'formation',
+      title: `${artist.name} Career Began`,
+      externalUrl: `https://musicbrainz.org/artist/${artist.id}`,
+      artistName: artist.name,
+    });
   }
 
   if (artist.activeYears?.end) {
     const date = parseMusicBrainzDate(artist.activeYears.end);
     if (date) {
       // For persons, activeYears.end means death; for groups, it means disbanded
-      const isPerson = artist.type === 'person';
       events.push({
         id: isPerson ? `death-${artist.id}` : `disbanded-${artist.id}`,
         date,
@@ -305,8 +336,20 @@ export function useArtistTimeline({
       allEvents.push(...concertEvents);
     }
 
-    // Add lifecycle events (formation/disbanded)
-    allEvents.push(...getLifecycleEvents(artist));
+    // Find first album year for persons (to mark career start)
+    let firstAlbumYear: number | undefined;
+    if (artist.type === 'person' && releaseGroups && releaseGroups.length > 0) {
+      const albumYears = releaseGroups
+        .map(rg => parseMusicBrainzDate(rg['first-release-date']))
+        .filter((d): d is Date => d !== null)
+        .map(d => d.getFullYear());
+      if (albumYears.length > 0) {
+        firstAlbumYear = Math.min(...albumYears);
+      }
+    }
+
+    // Add lifecycle events (birth/formation/death/disbanded)
+    allEvents.push(...getLifecycleEvents(artist, firstAlbumYear));
 
     // Add member events (including deaths from separately fetched data)
     allEvents.push(...getMemberEvents(relationships, relatedArtists, artist, memberDeaths));

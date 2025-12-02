@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { useSidebarPreferences, type SectionId } from '@/lib/sidebar';
 import { RecentConcerts } from '@/components/recent-concerts';
@@ -159,6 +159,20 @@ export function SidebarSections({
     </div>
   ), [selectedNodeId, hoveredArtistId, onSidebarNodeSelect, onSidebarNodeNavigate, onHoverArtist, extractInstruments, isRelationshipInYearRange]);
 
+  // Ref for album container to enable scrolling
+  const albumsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to highlighted album when selected from timeline
+  useEffect(() => {
+    if (!highlightedAlbum || !albumsContainerRef.current) return;
+
+    // Find the highlighted album element by data attribute
+    const highlightedEl = albumsContainerRef.current.querySelector('[data-album-highlighted="true"]');
+    if (highlightedEl) {
+      highlightedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedAlbum]);
+
   // Helper to render albums
   const renderAlbums = useCallback(() => {
     if (!displayArtist.albums) return null;
@@ -184,7 +198,7 @@ export function SidebarSections({
     const hasMore = sortedAlbums.length > MAX_ALBUMS;
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-2" ref={albumsContainerRef}>
         <div className="grid grid-cols-3 gap-2">
           {displayedAlbums.map(({ album, year: albumYear }) => {
             const musicUrl = `https://music.youtube.com/search?q=${encodeURIComponent(`${displayArtist.name} ${album.name}`)}`;
@@ -198,7 +212,8 @@ export function SidebarSections({
                 href={musicUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`text-center group cursor-pointer block transition-all ${isAlbumInRange ? '' : 'opacity-30'} ${isHighlighted ? 'ring-2 ring-purple-500 rounded' : ''}`}
+                data-album-highlighted={isHighlighted ? 'true' : 'false'}
+                className={`text-center group cursor-pointer block transition-all ${isAlbumInRange ? '' : 'opacity-30'} ${isHighlighted ? 'ring-4 ring-yellow-400 rounded' : ''}`}
                 onMouseEnter={() => albumYear && onHighlightAlbum(album.name, albumYear)}
                 onMouseLeave={() => onHighlightAlbum(null, null)}
               >
@@ -206,16 +221,16 @@ export function SidebarSections({
                   <img
                     src={album.artworkUrl}
                     alt={album.name}
-                    className={`w-full aspect-square rounded shadow-sm object-cover transition-all ${isHighlighted ? 'ring-2 ring-purple-500' : 'group-hover:ring-2 group-hover:ring-blue-400'}`}
+                    className={`w-full aspect-square rounded shadow-sm object-cover transition-all ${isHighlighted ? 'ring-4 ring-yellow-400' : 'group-hover:ring-2 group-hover:ring-blue-400'}`}
                   />
                 ) : (
-                  <div className={`w-full aspect-square rounded bg-gray-100 flex items-center justify-center transition-all ${isHighlighted ? 'ring-2 ring-purple-500' : 'group-hover:ring-2 group-hover:ring-blue-400'}`}>
+                  <div className={`w-full aspect-square rounded bg-gray-100 flex items-center justify-center transition-all ${isHighlighted ? 'ring-4 ring-yellow-400' : 'group-hover:ring-2 group-hover:ring-blue-400'}`}>
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                     </svg>
                   </div>
                 )}
-                <p className={`text-xs mt-1 truncate ${isHighlighted ? 'text-purple-600 font-medium' : 'group-hover:text-blue-600'}`} title={album.name}>{album.name}</p>
+                <p className={`text-xs mt-1 truncate ${isHighlighted ? 'text-yellow-600 font-medium' : 'group-hover:text-blue-600'}`} title={album.name}>{album.name}</p>
                 {albumYear && <p className="text-xs text-gray-400">{albumYear}</p>}
               </a>
             );

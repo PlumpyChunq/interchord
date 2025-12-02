@@ -161,6 +161,7 @@ export interface GraphState {
 export type TimelineEventType =
   | 'album'          // Major album release
   | 'concert'        // Concert/show
+  | 'birth'          // Person was born
   | 'formation'      // Band/group formed
   | 'disbanded'      // Band/group disbanded
   | 'member_join'    // Member joined the group

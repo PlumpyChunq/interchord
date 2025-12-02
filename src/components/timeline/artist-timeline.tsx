@@ -29,6 +29,7 @@ export const TIMELINE_DEFAULT_HEIGHT = 112;
 const EVENT_COLORS: Record<TimelineEventType, { bg: string; border: string; text: string }> = {
   album: { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-700' },
   concert: { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-700' },
+  birth: { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-700' },
   formation: { bg: 'bg-green-100', border: 'border-green-500', text: 'text-green-700' },
   disbanded: { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-700' },
   member_join: { bg: 'bg-emerald-100', border: 'border-emerald-400', text: 'text-emerald-700' },
@@ -39,6 +40,7 @@ const EVENT_COLORS: Record<TimelineEventType, { bg: string; border: string; text
 const EVENT_ICONS: Record<TimelineEventType, string> = {
   album: '💿',
   concert: '🎤',
+  birth: '👶',
   formation: '🎸',
   disbanded: '🔚',
   member_join: '➕',
@@ -143,6 +145,34 @@ export function ArtistTimeline({
     }
     return result;
   }, [yearRange]);
+
+  // Find the center of music career (based on album events, not birth)
+  const musicCareerCenter = useMemo(() => {
+    const albumEvents = events.filter(e => e.type === 'album');
+    if (albumEvents.length === 0) return null;
+    const albumYears = albumEvents.map(e => e.year);
+    const minYear = Math.min(...albumYears);
+    const maxYear = Math.max(...albumYears);
+    return Math.round((minYear + maxYear) / 2);
+  }, [events]);
+
+  // Scroll to center of music career on initial load
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    if (hasScrolledRef.current || !scrollContainerRef.current || !musicCareerCenter || years.length === 0) return;
+
+    // Find the index of the center year
+    const centerIndex = years.indexOf(musicCareerCenter);
+    if (centerIndex === -1) return;
+
+    // Calculate scroll position (60px per year column, center in viewport)
+    const columnWidth = 60;
+    const containerWidth = scrollContainerRef.current.clientWidth;
+    const scrollPosition = (centerIndex * columnWidth) - (containerWidth / 2) + (columnWidth / 2);
+
+    scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+    hasScrolledRef.current = true;
+  }, [musicCareerCenter, years]);
 
   const handleEventClick = useCallback(
     (event: TimelineEvent, e: React.MouseEvent) => {

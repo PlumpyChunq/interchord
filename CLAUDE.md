@@ -13,6 +13,16 @@ pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
 ```
 
+## Error Handling Policy
+
+**IMPORTANT:** Always address errors immediately when they appear in:
+- **Turbopack/Next.js dev overlay** (the popup in the browser)
+- **Terminal output** from `pnpm dev`
+- **ESLint warnings/errors** from `pnpm lint`
+- **TypeScript compilation errors**
+
+Never leave errors unresolved. Clean code is a priority.
+
 ## Project Overview
 
 A music discovery application that visualizes artist relationships through interactive graphs. Built with Next.js 16, Cytoscape.js for graph visualization, and MusicBrainz/Setlist.fm APIs for data.
