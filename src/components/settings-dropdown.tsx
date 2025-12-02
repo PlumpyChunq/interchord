@@ -5,32 +5,18 @@ import { Settings, Trash2, Check } from 'lucide-react';
 import { SpotifyAuth } from '@/components/spotify-auth';
 import { AppleMusicAuth } from '@/components/apple-music-auth';
 import { Button } from '@/components/ui/button';
-import { FAVORITES_KEY } from '@/lib/favorites/hooks';
-
-// localStorage keys
-const GENRE_ORDER_KEY = 'interchord-genre-order';
-const PRIMARY_SERVICE_KEY = 'interchord-primary-service';
-
-export type MusicService = 'spotify' | 'apple-music' | null;
-
-// Helper to get the primary music service
-export function getPrimaryMusicService(): MusicService {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem(PRIMARY_SERVICE_KEY);
-  if (stored === 'spotify' || stored === 'apple-music') return stored;
-  return null;
-}
-
-// Helper to set the primary music service
-export function setPrimaryMusicService(service: MusicService): void {
-  if (typeof window === 'undefined') return;
-  if (service) {
-    localStorage.setItem(PRIMARY_SERVICE_KEY, service);
-  } else {
-    localStorage.removeItem(PRIMARY_SERVICE_KEY);
-  }
-  window.dispatchEvent(new Event('primary-service-changed'));
-}
+import {
+  STORAGE_KEYS,
+  SESSION_KEYS,
+  removeStorageItem,
+  removeSessionItem,
+  isClient,
+} from '@/lib/storage';
+import {
+  type MusicService,
+  getPrimaryMusicService,
+  setPrimaryMusicService,
+} from '@/lib/streaming';
 
 export function SettingsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -67,26 +53,23 @@ export function SettingsDropdown() {
   }, [isOpen]);
 
   const handleClearFavorites = useCallback(() => {
-    try {
-      // Clear favorites
-      localStorage.removeItem(FAVORITES_KEY);
-      // Clear custom genre order
-      localStorage.removeItem(GENRE_ORDER_KEY);
-      // Clear empty genres
-      localStorage.removeItem('interchord-empty-genres');
-      // Clear custom genre colors
-      localStorage.removeItem('interchord-custom-genre-colors');
-      // Clear primary service setting
-      localStorage.removeItem(PRIMARY_SERVICE_KEY);
-      // Clear all spotify import session flags so it can re-import if needed
-      sessionStorage.removeItem('spotify-imported');
-      sessionStorage.removeItem('spotify-importing');
-      sessionStorage.removeItem('spotify-import-status');
-      // Refresh the page to ensure all components update
-      window.location.reload();
-    } catch {
-      // Ignore errors
-    }
+    if (!isClient()) return;
+
+    // Clear localStorage items
+    removeStorageItem(STORAGE_KEYS.FAVORITES);
+    removeStorageItem(STORAGE_KEYS.GENRE_ORDER);
+    removeStorageItem(STORAGE_KEYS.EMPTY_GENRES);
+    removeStorageItem(STORAGE_KEYS.CUSTOM_GENRE_COLORS);
+    removeStorageItem(STORAGE_KEYS.PRIMARY_SERVICE);
+
+    // Clear sessionStorage items
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTED);
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTING);
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORT_STATUS);
+
+    // Refresh the page to ensure all components update
+    window.location.reload();
+
     setShowConfirm(false);
     setIsOpen(false);
   }, []);

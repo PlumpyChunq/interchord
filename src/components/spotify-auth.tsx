@@ -6,38 +6,40 @@ import { Button } from '@/components/ui/button';
 import { useSpotifyAuth, useSpotifyCallback, getCuratedTopArtists, getFollowedArtists } from '@/lib/spotify';
 import { searchArtists } from '@/lib/musicbrainz/client';
 import { SPOTIFY_CONFIG } from '@/lib/spotify/config';
-
-// Storage keys
-const FAVORITES_KEY = 'interchord-favorites';
-const SPOTIFY_IMPORTED_KEY = 'spotify-imported';
-const SPOTIFY_IMPORTING_KEY = 'spotify-importing';
-const SPOTIFY_IMPORT_STATUS_KEY = 'spotify-import-status';
+import {
+  STORAGE_KEYS,
+  SESSION_KEYS,
+  STORAGE_EVENTS,
+  getStorageItem,
+  setStorageItem,
+  getSessionItem,
+  setSessionItem,
+  removeSessionItem,
+  dispatchStorageEvent,
+} from '@/lib/storage';
 
 // Helper to add favorite directly to localStorage (works even when component unmounts)
 function addFavoriteToStorage(artist: { id: string; name: string; type: string; country?: string; genres?: string[] }) {
-  try {
-    const stored = localStorage.getItem(FAVORITES_KEY);
-    const favorites = stored ? JSON.parse(stored) : [];
+  const favorites = getStorageItem<Array<{ id: string; name: string; type: string; country?: string; genres?: string[] }>>(STORAGE_KEYS.FAVORITES, []) ?? [];
 
-    // Don't add if already exists
-    if (favorites.some((f: { id: string }) => f.id === artist.id)) {
-      return false;
-    }
-
-    favorites.push({
-      id: artist.id,
-      name: artist.name,
-      type: artist.type,
-      country: artist.country,
-      genres: artist.genres,
-    });
-
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-    window.dispatchEvent(new Event('favorites-updated'));
-    return true;
-  } catch {
+  // Don't add if already exists
+  if (favorites.some((f) => f.id === artist.id)) {
     return false;
   }
+
+  favorites.push({
+    id: artist.id,
+    name: artist.name,
+    type: artist.type,
+    country: artist.country,
+    genres: artist.genres,
+  });
+
+  const saved = setStorageItem(STORAGE_KEYS.FAVORITES, favorites);
+  if (saved) {
+    dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED);
+  }
+  return saved;
 }
 
 interface SpotifyAuthProps {
@@ -51,22 +53,13 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
 
   // Initialize state from sessionStorage synchronously to prevent race conditions
   const [isImporting, setIsImporting] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(SPOTIFY_IMPORTING_KEY) === 'true';
-    }
-    return false;
+    return getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTING) === 'true';
   });
   const [importStatus, setImportStatus] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(SPOTIFY_IMPORT_STATUS_KEY);
-    }
-    return null;
+    return getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORT_STATUS);
   });
   const [hasImported, setHasImported] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(SPOTIFY_IMPORTED_KEY) === 'true';
-    }
-    return false;
+    return getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTED) === 'true';
   });
 
   // Poll for import status updates (in case import is running in background)
@@ -74,9 +67,9 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
     if (!isImporting) return;
 
     const interval = setInterval(() => {
-      const status = sessionStorage.getItem(SPOTIFY_IMPORT_STATUS_KEY);
-      const importing = sessionStorage.getItem(SPOTIFY_IMPORTING_KEY) === 'true';
-      const imported = sessionStorage.getItem(SPOTIFY_IMPORTED_KEY) === 'true';
+      const status = getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORT_STATUS);
+      const importing = getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTING) === 'true';
+      const imported = getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTED) === 'true';
 
       if (status !== importStatus) {
         setImportStatus(status);
@@ -100,24 +93,24 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
   const updateImportStatus = useCallback((status: string | null) => {
     setImportStatus(status);
     if (status) {
-      sessionStorage.setItem(SPOTIFY_IMPORT_STATUS_KEY, status);
+      setSessionItem(SESSION_KEYS.SPOTIFY_IMPORT_STATUS, status);
     } else {
-      sessionStorage.removeItem(SPOTIFY_IMPORT_STATUS_KEY);
+      removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORT_STATUS);
     }
   }, []);
 
   // Import artists from Spotify
   const importArtists = useCallback(async () => {
     // Check both state and sessionStorage to prevent duplicate imports
-    const alreadyImported = hasImported || sessionStorage.getItem(SPOTIFY_IMPORTED_KEY) === 'true';
-    const alreadyImporting = isImporting || sessionStorage.getItem(SPOTIFY_IMPORTING_KEY) === 'true' || importInProgressRef.current;
+    const alreadyImported = hasImported || getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTED) === 'true';
+    const alreadyImporting = isImporting || getSessionItem<string>(SESSION_KEYS.SPOTIFY_IMPORTING) === 'true' || importInProgressRef.current;
 
     if (alreadyImported || alreadyImporting) return;
 
     // Mark import as in progress in both state and sessionStorage
     importInProgressRef.current = true;
     setIsImporting(true);
-    sessionStorage.setItem(SPOTIFY_IMPORTING_KEY, 'true');
+    setSessionItem(SESSION_KEYS.SPOTIFY_IMPORTING, 'true');
     updateImportStatus('Fetching your top artists...');
 
     try {
@@ -135,8 +128,8 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
       if (spotifyArtists.length === 0) {
         updateImportStatus('No artists found in your Spotify library.');
         setHasImported(true);
-        sessionStorage.setItem(SPOTIFY_IMPORTED_KEY, 'true');
-        sessionStorage.removeItem(SPOTIFY_IMPORTING_KEY);
+        setSessionItem(SESSION_KEYS.SPOTIFY_IMPORTED, 'true');
+        removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTING);
         importInProgressRef.current = false;
         return;
       }
@@ -184,7 +177,7 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
 
       updateImportStatus(message);
       setHasImported(true);
-      sessionStorage.setItem(SPOTIFY_IMPORTED_KEY, 'true');
+      setSessionItem(SESSION_KEYS.SPOTIFY_IMPORTED, 'true');
 
       // Clear status after a few seconds
       setTimeout(() => {
@@ -196,7 +189,7 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
       updateImportStatus('Failed to import artists. Please try again.');
     } finally {
       setIsImporting(false);
-      sessionStorage.removeItem(SPOTIFY_IMPORTING_KEY);
+      removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTING);
       importInProgressRef.current = false;
     }
   }, [hasImported, isImporting, onImportComplete, updateImportStatus]);
@@ -219,9 +212,9 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
     setIsImporting(false);
     setImportStatus(null);
     importInProgressRef.current = false;
-    sessionStorage.removeItem(SPOTIFY_IMPORTED_KEY);
-    sessionStorage.removeItem(SPOTIFY_IMPORTING_KEY);
-    sessionStorage.removeItem(SPOTIFY_IMPORT_STATUS_KEY);
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTED);
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORTING);
+    removeSessionItem(SESSION_KEYS.SPOTIFY_IMPORT_STATUS);
   };
 
   // Not configured - show setup message

@@ -2,9 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ArtistNode } from '@/types';
+import {
+  STORAGE_KEYS,
+  STORAGE_EVENTS,
+  getStorageItem,
+  setStorageItem,
+  addStorageEventListener,
+  dispatchStorageEvent,
+} from '@/lib/storage';
 
-// localStorage key
-export const FAVORITES_KEY = 'interchord-favorites';
+// Re-export for backwards compatibility
+export const FAVORITES_KEY = STORAGE_KEYS.FAVORITES;
 
 // Type for stored artist data (minimal version of ArtistNode)
 export interface StoredArtist {
@@ -37,13 +45,9 @@ export function useFavorites(): UseFavoritesResult {
   // Load favorites from localStorage on mount
   useEffect(() => {
     const loadFavorites = () => {
-      try {
-        const stored = localStorage.getItem(FAVORITES_KEY);
-        if (stored) {
-          setFavorites(JSON.parse(stored));
-        }
-      } catch {
-        // Ignore localStorage errors
+      const stored = getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []);
+      if (stored) {
+        setFavorites(stored);
       }
       setIsLoaded(true);
     };
@@ -52,39 +56,24 @@ export function useFavorites(): UseFavoritesResult {
 
     // Listen for storage events to update favorites reactively (other tabs)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === FAVORITES_KEY) {
-        try {
-          if (e.newValue) {
-            setFavorites(JSON.parse(e.newValue));
-          } else {
-            setFavorites([]);
-          }
-        } catch {
-          // Ignore parse errors
-        }
+      if (e.key === STORAGE_KEYS.FAVORITES) {
+        const stored = getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []);
+        setFavorites(stored ?? []);
       }
     };
 
     // Listen for custom event for same-tab updates
     const handleCustomStorage = () => {
-      try {
-        const stored = localStorage.getItem(FAVORITES_KEY);
-        if (stored) {
-          setFavorites(JSON.parse(stored));
-        } else {
-          setFavorites([]);
-        }
-      } catch {
-        // Ignore
-      }
+      const stored = getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []);
+      setFavorites(stored ?? []);
     };
 
     window.addEventListener('storage', handleStorage);
-    window.addEventListener('favorites-updated', handleCustomStorage);
+    const removeCustomListener = addStorageEventListener(STORAGE_EVENTS.FAVORITES_UPDATED, handleCustomStorage);
 
     return () => {
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('favorites-updated', handleCustomStorage);
+      removeCustomListener();
     };
   }, []);
 
@@ -104,12 +93,9 @@ export function useFavorites(): UseFavoritesResult {
         return prev;
       }
       const updated = [...prev, stored];
-      try {
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+      if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
         // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
-        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
-      } catch {
-        // Ignore storage errors
+        setTimeout(() => dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED), 0);
       }
       return updated;
     });
@@ -119,12 +105,9 @@ export function useFavorites(): UseFavoritesResult {
   const removeFavorite = useCallback((artistId: string) => {
     setFavorites((prev) => {
       const updated = prev.filter((f) => f.id !== artistId);
-      try {
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+      if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
         // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
-        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
-      } catch {
-        // Ignore storage errors
+        setTimeout(() => dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED), 0);
       }
       return updated;
     });
@@ -142,12 +125,9 @@ export function useFavorites(): UseFavoritesResult {
         }
         return f;
       });
-      try {
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+      if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
         // Dispatch custom event for same-tab updates (deferred to avoid setState during render)
-        setTimeout(() => window.dispatchEvent(new Event('favorites-updated')), 0);
-      } catch {
-        // Ignore storage errors
+        setTimeout(() => dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED), 0);
       }
       return updated;
     });

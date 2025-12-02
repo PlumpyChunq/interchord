@@ -9,6 +9,7 @@ import { StreamingSelector } from '@/components/streaming-selector';
 import type { ArtistNode, ArtistRelationship, TimelineEvent } from '@/types';
 import type { GraphFilterState } from '@/components/graph';
 import { parseYear } from '@/lib/utils';
+import { normalizeAlbumTitle } from '@/lib/utils/album';
 
 interface GroupedItem {
   relationship: ArtistRelationship;
@@ -218,20 +219,6 @@ export function SidebarSections({
     }
   }, [highlightedAlbum]);
 
-  // Normalize album title for deduplication (same logic as MusicBrainz client)
-  const normalizeAlbumTitle = useCallback((title: string): string => {
-    return title
-      .replace(/\s*[:–—-]\s+.*$/, '') // Remove subtitles
-      .replace(/([a-z])([A-Z])/g, '$1 $2') // Split camelCase
-      .toLowerCase()
-      .replace(/\s*\([^)]*\)\s*/g, ' ') // Remove parentheticals
-      .replace(/\s*\[[^\]]*\]\s*/g, ' ') // Remove brackets
-      .replace(/\s*[&]+\s*/g, ' and ') // Normalize ampersand
-      .replace(/\b(and|the)\b/g, ' ') // Remove common words
-      .replace(/[^a-z0-9\s]/g, '') // Remove non-alphanumeric
-      .replace(/\s+/g, ' ') // Collapse whitespace
-      .trim();
-  }, []);
 
   // Helper to render albums
   const renderAlbums = useCallback(() => {
@@ -336,7 +323,7 @@ export function SidebarSections({
         )}
       </div>
     );
-  }, [displayArtist.albums, displayArtist.name, graphFilters.yearRange, onHighlightAlbum, findAlbumYear, isAlbumHighlighted, streamingService, normalizeAlbumTitle]);
+  }, [displayArtist.albums, displayArtist.name, graphFilters.yearRange, onHighlightAlbum, findAlbumYear, isAlbumHighlighted, streamingService]);
 
   // Build sections array with content
   type SectionData = { id: SectionId; title: string; count?: number; content: React.ReactNode };

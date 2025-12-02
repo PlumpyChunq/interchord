@@ -1,5 +1,6 @@
 export {
   type StreamingService,
+  type MusicService,
   type StreamingServiceInfo,
   STREAMING_SERVICES,
   getStreamingPreference,
@@ -7,6 +8,8 @@ export {
   getPreferredService,
   getAlbumStreamingUrl,
   getArtistStreamingUrl,
+  getPrimaryMusicService,
+  setPrimaryMusicService,
 } from './preferences';
 
 export { useStreamingPreference, useAlbumStreamingUrl } from './hooks';

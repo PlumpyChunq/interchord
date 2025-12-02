@@ -14,6 +14,7 @@ import type {
   ArtistRelationship,
   ArtistGraph,
 } from '@/types';
+import { normalizeAlbumTitle } from '@/lib/utils/album';
 
 const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'InterChord/0.1.0 (https://github.com/jstone/interchord)';
@@ -219,31 +220,6 @@ export async function buildArtistGraph(mbid: string): Promise<ArtistGraph> {
   return { nodes, edges };
 }
 
-/**
- * Normalize album title for deduplication
- * Removes edition markers, subtitles, punctuation differences, etc.
- */
-function normalizeAlbumTitle(title: string): string {
-  return title
-    // Remove subtitles (everything after colon or dash with spaces)
-    .replace(/\s*[:–—-]\s+.*$/, '')
-    // Add spaces before capitals in camelCase (GodWeenSatan -> God Ween Satan)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    // Remove ALL parentheticals (handles editions, regions, etc.)
-    .replace(/\s*\([^)]*\)\s*/g, ' ')
-    // Remove ALL brackets
-    .replace(/\s*\[[^\]]*\]\s*/g, ' ')
-    // Normalize ampersand to 'and' (handle various ampersand chars)
-    .replace(/\s*[&\u0026\uFF06]+\s*/g, ' and ')
-    // Remove 'and' and 'the' for looser matching
-    .replace(/\b(and|the)\b/g, ' ')
-    // Remove all non-alphanumeric
-    .replace(/[^a-z0-9\s]/g, '')
-    // Collapse whitespace
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 /**
  * Get release groups (albums, EPs, singles) for an artist
