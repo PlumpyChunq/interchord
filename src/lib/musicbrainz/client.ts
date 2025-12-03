@@ -1,8 +1,15 @@
 /**
  * MusicBrainz API Client
  *
- * CRITICAL: MusicBrainz has a strict 1 request/second rate limit.
- * This client implements request queuing to respect this limit.
+ * Supports both the public MusicBrainz API and local mirror servers.
+ *
+ * Configuration:
+ *   - Set NEXT_PUBLIC_MUSICBRAINZ_API to use a local server (e.g., http://stonefrog-db01.stonefrog.com:5000/ws/2)
+ *   - If not set, defaults to public API with rate limiting
+ *
+ * Rate Limiting:
+ *   - Public API: Strict 1 request/second limit (enforced via queue)
+ *   - Local server: No rate limiting (unlimited requests)
  */
 
 import type {
@@ -16,9 +23,24 @@ import type {
 } from '@/types';
 import { normalizeAlbumTitle } from '@/lib/utils/album';
 
-const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
+// Server configuration
+const LOCAL_MUSICBRAINZ_API = process.env.NEXT_PUBLIC_MUSICBRAINZ_API;
+const PUBLIC_MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'InterChord/0.1.0 (https://github.com/jstone/interchord)';
 const RATE_LIMIT_MS = 1100; // 1.1 seconds between requests (safety margin)
+
+// Track which server we're currently using (can change on fallback)
+let currentServer = LOCAL_MUSICBRAINZ_API || PUBLIC_MUSICBRAINZ_API;
+let usingLocalServer = !!LOCAL_MUSICBRAINZ_API;
+let localServerFailed = false;
+
+// Log which server is being used (only in development)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log(`[MusicBrainz] Primary server: ${currentServer}`);
+  if (LOCAL_MUSICBRAINZ_API) {
+    console.log(`[MusicBrainz] Fallback enabled: ${PUBLIC_MUSICBRAINZ_API}`);
+  }
+}
 
 // Request queue for rate limiting
 let lastRequestTime = 0;
@@ -34,11 +56,14 @@ async function processQueue(): Promise<void> {
   isProcessingQueue = true;
 
   while (requestQueue.length > 0) {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
+    // Skip rate limiting for local servers (no 1 req/sec restriction)
+    if (!usingLocalServer) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTime;
 
-    if (timeSinceLastRequest < RATE_LIMIT_MS) {
-      await sleep(RATE_LIMIT_MS - timeSinceLastRequest);
+      if (timeSinceLastRequest < RATE_LIMIT_MS) {
+        await sleep(RATE_LIMIT_MS - timeSinceLastRequest);
+      }
     }
 
     const request = requestQueue.shift();
@@ -73,33 +98,73 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Make a rate-limited request to MusicBrainz API
+ * Make a single fetch request to a MusicBrainz server
+ */
+async function fetchFromServer<T>(
+  serverUrl: string,
+  endpoint: string,
+  params: Record<string, string>
+): Promise<T> {
+  const searchParams = new URLSearchParams({
+    fmt: 'json',
+    ...params,
+  });
+
+  const url = `${serverUrl}${endpoint}?${searchParams}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (response.status === 503) {
+    throw new Error('MusicBrainz rate limit exceeded. Please wait and try again.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`MusicBrainz API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Make a rate-limited request to MusicBrainz API with fallback support
+ *
+ * If a local server is configured and fails, automatically falls back to the public API.
+ * Once fallback occurs, continues using public API for the session.
  */
 async function mbFetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
   return queueRequest(async () => {
-    const searchParams = new URLSearchParams({
-      fmt: 'json',
-      ...params,
-    });
-
-    const url = `${MUSICBRAINZ_API}${endpoint}?${searchParams}`;
-
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (response.status === 503) {
-      throw new Error('MusicBrainz rate limit exceeded. Please wait and try again.');
+    // If local server previously failed, go straight to public API
+    if (localServerFailed && LOCAL_MUSICBRAINZ_API) {
+      return fetchFromServer<T>(PUBLIC_MUSICBRAINZ_API, endpoint, params);
     }
 
-    if (!response.ok) {
-      throw new Error(`MusicBrainz API error: ${response.status} ${response.statusText}`);
-    }
+    try {
+      return await fetchFromServer<T>(currentServer, endpoint, params);
+    } catch (error) {
+      // If using local server and it fails, try fallback to public API
+      if (usingLocalServer && LOCAL_MUSICBRAINZ_API && !localServerFailed) {
+        console.warn(
+          `[MusicBrainz] Local server failed, falling back to public API:`,
+          error instanceof Error ? error.message : error
+        );
 
-    return response.json();
+        // Mark local server as failed and switch to public API
+        localServerFailed = true;
+        usingLocalServer = false;
+        currentServer = PUBLIC_MUSICBRAINZ_API;
+
+        // Retry with public API (will now use rate limiting)
+        return fetchFromServer<T>(PUBLIC_MUSICBRAINZ_API, endpoint, params);
+      }
+
+      // Re-throw if already using public API or no fallback available
+      throw error;
+    }
   });
 }
 
