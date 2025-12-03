@@ -6,7 +6,10 @@ export {
   getArtistRelationships,
   getArtistReleaseGroups,
   buildArtistGraph,
+  getServerStatus,
 } from './client';
+
+export type { MusicBrainzServerStatus } from './client';
 
 // React Query hooks
 export {

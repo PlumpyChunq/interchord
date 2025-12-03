@@ -5,6 +5,7 @@ import { ArtistSearch } from '@/components/artist-search';
 import { ArtistDetail } from '@/components/artist-detail';
 import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
 import { SettingsDropdown } from '@/components/settings-dropdown';
+import { MusicBrainzStatus } from '@/components/musicbrainz-status';
 import { useFavorites } from '@/lib/favorites';
 import type { ArtistNode } from '@/types';
 
@@ -34,7 +35,8 @@ export default function Home() {
               The Music Web
             </p>
           </div>
-          <div className="w-48 flex justify-end">
+          <div className="w-48 flex items-center justify-end gap-3">
+            <MusicBrainzStatus />
             <SettingsDropdown />
           </div>
         </header>

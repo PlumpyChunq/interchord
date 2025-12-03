@@ -14,6 +14,15 @@ function generateRandomString(length: number): string {
 async function sha256(plain: string): Promise<ArrayBuffer> {
   const encoder = new TextEncoder();
   const data = encoder.encode(plain);
+
+  // crypto.subtle requires secure context (HTTPS or localhost)
+  if (!crypto.subtle) {
+    throw new Error(
+      'Crypto API not available. Please access via localhost:3000 or HTTPS. ' +
+      'Current URL may be using 127.0.0.1 or HTTP which lacks crypto.subtle support.'
+    );
+  }
+
   return crypto.subtle.digest('SHA-256', data);
 }
 

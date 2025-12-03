@@ -34,6 +34,40 @@ let currentServer = LOCAL_MUSICBRAINZ_API || PUBLIC_MUSICBRAINZ_API;
 let usingLocalServer = !!LOCAL_MUSICBRAINZ_API;
 let localServerFailed = false;
 
+// Request statistics
+let requestCount = 0;
+let totalResponseTime = 0;
+let lastResponseTime = 0;
+
+export interface MusicBrainzServerStatus {
+  isLocal: boolean;
+  serverUrl: string;
+  hasFallback: boolean;
+  didFallback: boolean;
+  stats: {
+    requestCount: number;
+    avgResponseTime: number;
+    lastResponseTime: number;
+  };
+}
+
+/**
+ * Get current server status and statistics
+ */
+export function getServerStatus(): MusicBrainzServerStatus {
+  return {
+    isLocal: usingLocalServer,
+    serverUrl: currentServer,
+    hasFallback: !!LOCAL_MUSICBRAINZ_API,
+    didFallback: localServerFailed,
+    stats: {
+      requestCount,
+      avgResponseTime: requestCount > 0 ? Math.round(totalResponseTime / requestCount) : 0,
+      lastResponseTime,
+    },
+  };
+}
+
 // Log which server is being used (only in development)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log(`[MusicBrainz] Primary server: ${currentServer}`);
@@ -111,6 +145,7 @@ async function fetchFromServer<T>(
   });
 
   const url = `${serverUrl}${endpoint}?${searchParams}`;
+  const startTime = performance.now();
 
   const response = await fetch(url, {
     headers: {
@@ -118,6 +153,12 @@ async function fetchFromServer<T>(
       'Accept': 'application/json',
     },
   });
+
+  // Track response time
+  const responseTime = Math.round(performance.now() - startTime);
+  requestCount++;
+  totalResponseTime += responseTime;
+  lastResponseTime = responseTime;
 
   if (response.status === 503) {
     throw new Error('MusicBrainz rate limit exceeded. Please wait and try again.');
