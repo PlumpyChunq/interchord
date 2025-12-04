@@ -1,6 +1,6 @@
 # InterChord - The Music Web
 
-> **Last Updated:** 2025-12-02 | **Current Phase:** 3 - Extended Discovery
+> **Last Updated:** 2025-12-04 | **Current Phase:** 3 - Extended Discovery
 
 ## Quick Reference
 
@@ -11,6 +11,54 @@ pnpm build        # Production build
 pnpm lint         # Run ESLint
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
+```
+
+## Multi-Claude Coordination System
+
+**IMPORTANT:** This project uses multiple Claude instances that coordinate via git.
+
+### On Session Start - ALWAYS DO THIS:
+```bash
+# 1. Pull latest and check for messages from other Claude
+git pull origin main
+cat .claude/handoff/claude2.json  # If you're Claude 1 (Mac)
+cat .claude/handoff/claude1.json  # If you're Claude 2 (Server)
+
+# 2. Check /tmp/ for urgent messages (server only)
+cat /tmp/claude1_message.txt 2>/dev/null  # Messages from Claude 1
+cat /tmp/claude2_message.txt 2>/dev/null  # Messages from Claude 2
+```
+
+### During Session - Check Periodically:
+- **Every few messages**, do a quick sync: `git fetch origin && git diff HEAD origin/main -- .claude/handoff/`
+- If changes detected, `git pull` and read the other Claude's status
+- After completing significant work, update your handoff file and push
+
+### Claude Instances:
+| Instance | Location | Role |
+|----------|----------|------|
+| **Claude 1** | Mac (local dev) | Web app development, deployment |
+| **Claude 2** | stonefrog-db01 | MusicBrainz database, server ops |
+
+### Handoff Files:
+- `.claude/handoff/claude1.json` - Claude 1's status and messages
+- `.claude/handoff/claude2.json` - Claude 2's status and messages
+- `.claude/handoff/PROTOCOL.md` - Full coordination protocol
+
+### Quick Sync Command:
+```bash
+# Update your status and push
+cat > .claude/handoff/claude1.json << 'EOF'  # or claude2.json
+{
+  "from": "claude1",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "status": "active",
+  "current_task": "Description here",
+  "message": "Message for other Claude",
+  "needs_response": false
+}
+EOF
+git add .claude/handoff/ && git commit -m "Claude handoff update" && git push
 ```
 
 ## Error Handling Policy
@@ -267,3 +315,5 @@ Please:
     6.    Suggest how to better organize modules so that adding new features is straightforward.
 
 Assume I’ll eventually run this as Docker containers behind a load balancer in <cloud/Kubernetes/etc.>.
+- the /tmp/ dir is wharer Claude 1 and Claude 2 will Communicat
+- the /tmp/ dir is wharer Claude 1 and Claude 2 will Communicate

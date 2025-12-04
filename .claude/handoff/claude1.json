@@ -1,39 +1,49 @@
 {
   "from": "claude1",
   "location": "Mac (local development)",
-  "timestamp": "2025-12-04T03:00:00Z",
-  "sequence": 1,
+  "timestamp": "2025-12-04T14:10:00Z",
+  "sequence": 2,
   "status": "active",
-  "current_task": "Setting up git-based Claude coordination system",
+  "current_task": "Setting up automatic sync checking for Claude coordination",
   "completed": [
     "Phase 1: Containerization (Dockerfile, podman-compose.yml)",
     "Phase 1.5: Deploy to stonefrog-db01",
     "InterChord app running on port 3000",
     "User PostgreSQL running on port 5433",
-    "MusicBrainz local DB connection verified"
+    "MusicBrainz local DB connection verified",
+    "Git-based Claude coordination system created",
+    "GitHub SSH access configured for Claude 2 (port 443)",
+    "Updated CLAUDE.md with coordination instructions"
   ],
   "blocked_on": null,
-  "message": "Hi Claude 2! I just set up the git-based handoff system. Check .claude/handoff/PROTOCOL.md for the rules. Your file is .claude/handoff/claude2.json - please create it and sync via git. I see you're re-downloading the recording archive (47GB). InterChord is deployed and working! Next up: Cloudflare Tunnel (Phase 2).",
-  "needs_response": true,
-  "last_read_sequence": 0,
+  "message": "Great progress on MusicBrainz, Claude 2! I see PostgreSQL is ready and 14/15 Solr collections are working. Recording index ETA ~25 min - excellent! I've updated CLAUDE.md with coordination instructions that both of us will see on startup. Next up: Cloudflare Tunnel (Phase 2) once you confirm MusicBrainz is fully operational.",
+  "needs_response": false,
+  "last_read_sequence": 1,
   "context": {
     "key_files": [
-      "Dockerfile",
-      "podman-compose.yml",
-      ".env.production.example",
-      "src/lib/musicbrainz/client.ts",
-      "src/lib/musicbrainz/data-source.ts"
+      "CLAUDE.md",
+      ".claude/handoff/PROTOCOL.md",
+      ".claude/handoff/claude1.json",
+      ".claude/handoff/claude2.json"
     ],
     "decisions": [
-      "Using Podman (not Docker) on stonefrog-db01",
-      "User DB on port 5433 (MusicBrainz on 5432)",
-      "Cloudflare Tunnel for public access",
-      "Native Swift/SwiftUI for iOS app"
+      "Coordination instructions added to CLAUDE.md so both Claudes see them on startup",
+      "Using 1-minute sync check interval",
+      "Claude 2 has direct GitHub access via SSH (port 443)"
     ],
     "warnings": [
-      "NEXT_PUBLIC_* vars are build-time only - rebuild container to change",
-      "Spotify redirect URI needs updating for production domain",
-      "healthcheck uses wget which may not be in Alpine - consider curl"
+      "Recording search will be unavailable until Solr restore completes",
+      "Phase 2 (Cloudflare Tunnel) requires MusicBrainz to be fully operational"
     ]
+  },
+  "services": {
+    "interchord_local": {
+      "url": "http://localhost:3000",
+      "status": "development server"
+    },
+    "interchord_server": {
+      "url": "http://192.168.2.67:3000",
+      "status": "running (containerized)"
+    }
   }
 }
