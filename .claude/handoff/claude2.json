@@ -1,64 +1,42 @@
 {
   "from": "claude2",
-  "location": "stonefrog-db01 (192.168.2.67 - database server)",
-  "timestamp": "2025-12-04T14:27:00Z",
-  "sequence": 3,
-  "status": "complete_with_issues",
-  "current_task": "MusicBrainz mirror operational - 14/15 Solr collections working",
+  "location": "stonefrog-db01 (production server)",
+  "timestamp": "2025-12-04T21:51:00Z",
+  "sequence": 4,
+  "status": "completed",
+  "current_task": "Implemented systemd auto-start for all services",
   "completed": [
-    "Started MusicBrainz containers",
-    "PostgreSQL database loaded and running",
-    "Restored 14/15 Solr collections (33.6M documents)",
-    "Downloaded fresh recording.tar.zst (47GB)",
-    "Attempted recording restore (FAILED - upstream backup corrupted)",
-    "Tested SSH push to GitHub (working!)"
+    "All services back online after reboot",
+    "Created systemd user unit: musicbrainz.service",
+    "Created systemd user unit: interchord.service (depends on musicbrainz)",
+    "Enabled both services for auto-start on boot",
+    "Verified lingering is enabled (services start without login)",
+    "Tested full boot sequence via systemd"
   ],
-  "blocked_on": "Recording backup archive from data.metabrainz.org is corrupted - cannot fix without MusicBrainz updating their backups",
-  "message": "MusicBrainz mirror is 93% operational! All services working except recording search. PostgreSQL fully operational. For InterChord: use PostgreSQL direct queries for track lookups, or use work/release search as alternatives.",
+  "message": "DONE: interchord.stonefrog.com is back online. Full systemd integration complete - all services will auto-start on boot in the correct dependency order. Boot sequence: musicbrainz.service starts first (PostgreSQL, Solr, API), then interchord.service (user DB, Next.js app, Cloudflare tunnel). Both are enabled and will start automatically after reboot.",
   "needs_response": false,
-  "last_read_sequence": 0,
-  "context": {
-    "key_files": [
-      "/home/jstone/musicbrainz-docker/docker-compose.yml",
-      "/home/jstone/musicbrainz-docker/.env",
-      "/tmp/HANDOFF-MUSICBRAINZ.md"
+  "last_read_sequence": 5,
+  "implementation_details": {
+    "systemd_units": [
+      "~/.config/systemd/user/musicbrainz.service",
+      "~/.config/systemd/user/interchord.service"
     ],
-    "decisions": [
-      "Using pre-built Solr backup archives instead of rebuilding indexes",
-      "Recording archive corrupted - multiple download attempts failed",
-      "Recommending PostgreSQL direct queries for track lookups"
-    ],
-    "warnings": [
-      "Recording search (tracks) returns 0 results - upstream backup corrupted",
-      "Alternative: use sir indexer to rebuild (takes many hours)"
-    ]
-  },
-  "services": {
-    "postgresql": {
-      "host": "192.168.2.67",
-      "port": 5432,
-      "user": "musicbrainz",
-      "password": "musicbrainz",
-      "database": "musicbrainz_db",
-      "status": "running"
-    },
-    "solr": {
-      "host": "192.168.2.67",
-      "port": 8983,
-      "status": "running",
-      "collections_ready": "14/15",
-      "working": ["artist", "release", "release-group", "work", "url", "annotation", "area", "cdstub", "event", "instrument", "label", "place", "series", "tag"],
-      "failed": ["recording (upstream backup corrupted)"],
-      "total_docs": 33618793
-    },
-    "web_ui": {
-      "url": "http://192.168.2.67:5000",
-      "status": "running"
+    "dependency_chain": "interchord.service Requires=musicbrainz.service After=musicbrainz.service",
+    "lingering": "enabled (loginctl enable-linger jstone)",
+    "restart_policy": "on-failure with RestartSec=30",
+    "management_commands": {
+      "status": "systemctl --user status musicbrainz interchord",
+      "start": "systemctl --user start musicbrainz interchord",
+      "stop": "systemctl --user stop interchord musicbrainz",
+      "restart": "systemctl --user restart musicbrainz interchord",
+      "logs": "journalctl --user -u musicbrainz -u interchord -f"
     }
   },
-  "test_queries": {
-    "artist": "curl 'http://192.168.2.67:8983/solr/artist/select?q=beatles&wt=json'",
-    "release": "curl 'http://192.168.2.67:8983/solr/release/select?q=abbey+road&wt=json'",
-    "work": "curl 'http://192.168.2.67:8983/solr/work/select?q=yesterday&wt=json'"
-  }
+  "current_health": {
+    "musicbrainz_containers": 6,
+    "interchord_containers": 3,
+    "tunnel_status": "registered and active",
+    "external_access": "working (Cloudflare Access requires auth)"
+  },
+  "note": "The health endpoint shows 'degraded' because InterChord isn't connecting to MusicBrainz DB directly yet (port binding issue). The API works fine via the MusicBrainz web service on port 5000."
 }
