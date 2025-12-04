@@ -561,3 +561,34 @@ See `PROGRESS.md` for the complete roadmap (Phases 3-7). Key upcoming items:
 - Confluence documentation: [InterChord Project](https://stonefrog.atlassian.net/wiki/spaces/STONEFROG/pages/1936752642)
 - For production operations, see **Production Operations** section above
 - For incident response, see **Incident Response Runbook** section above
+
+---
+
+## References & Best Practices
+
+This documentation follows industry standards:
+
+### 12-Factor App Methodology
+- [12 Factor App: Complete Guide (2025)](https://pradeepl.com/blog/12-factor-cloud-native-apps/)
+- [12 Factor App: Beginner's Guide](https://dev.to/cadienvan/the-twelve-factor-app-methodology-a-beginners-guide-12m5)
+- [Mastering App Scalability](https://www.einfochips.com/blog/mastering-app-scalability-with-the-12-factor/)
+
+### SRE & Runbook Best Practices
+- [SRE Documentation Best Practices](https://www.techtarget.com/searchitoperations/tip/An-introduction-to-SRE-documentation-best-practices)
+- [Runbook Automation Best Practices](https://www.solarwinds.com/sre-best-practices/runbook-automation)
+- [Runbook Templates for SRE](https://www.squadcast.com/sre-best-practices/runbook-template)
+- [SRE Best Practices Guide](https://www.squadcast.com/sre-best-practices)
+
+### Cloud-Native & Kubernetes
+- [SRE Practices for Kubernetes](https://adrianhynes.medium.com/sre-practices-for-kubernetes-platforms-part-1-da5b76eedfb5)
+- [Awesome SRE Resources](https://github.com/dastergon/awesome-sre)
+
+### Key Principles Applied
+| Principle | Implementation |
+|-----------|----------------|
+| **Factor 3: Config** | Environment variables in `.env.production` |
+| **Factor 4: Backing Services** | MusicBrainz, PostgreSQL as attached resources |
+| **Factor 5: Build/Release/Run** | Podman container workflow |
+| **Factor 9: Disposability** | Health checks, fast startup |
+| **Factor 11: Logs** | `podman logs` as event streams |
+| **SRE Runbooks** | Incident Response section with troubleshooting steps |
