@@ -28,11 +28,15 @@ const LOCAL_MUSICBRAINZ_API = process.env.NEXT_PUBLIC_MUSICBRAINZ_API;
 const PUBLIC_MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'InterChord/0.1.0 (https://github.com/jstone/interchord)';
 const RATE_LIMIT_MS = 1100; // 1.1 seconds between requests (safety margin)
+const HEALTH_CHECK_INTERVAL_MS = 30000; // Check local server health every 30 seconds
+const HEALTH_CHECK_TIMEOUT_MS = 5000; // Timeout for health check requests
 
 // Track which server we're currently using (can change on fallback)
 let currentServer = LOCAL_MUSICBRAINZ_API || PUBLIC_MUSICBRAINZ_API;
 let usingLocalServer = !!LOCAL_MUSICBRAINZ_API;
 let localServerFailed = false;
+let lastHealthCheckTime = 0;
+let healthCheckInProgress = false;
 
 // Request statistics
 let requestCount = 0;
@@ -42,8 +46,12 @@ let lastResponseTime = 0;
 export interface MusicBrainzServerStatus {
   isLocal: boolean;
   serverUrl: string;
+  localServerUrl: string | null;
+  publicServerUrl: string;
   hasFallback: boolean;
-  didFallback: boolean;
+  inFallbackMode: boolean;
+  recoveryEnabled: boolean;
+  nextHealthCheckIn: number | null; // ms until next health check, or null if not in fallback
   stats: {
     requestCount: number;
     avgResponseTime: number;
@@ -55,17 +63,53 @@ export interface MusicBrainzServerStatus {
  * Get current server status and statistics
  */
 export function getServerStatus(): MusicBrainzServerStatus {
+  const now = Date.now();
+  const timeSinceLastCheck = now - lastHealthCheckTime;
+  const timeUntilNextCheck = localServerFailed
+    ? Math.max(0, HEALTH_CHECK_INTERVAL_MS - timeSinceLastCheck)
+    : null;
+
   return {
     isLocal: usingLocalServer,
     serverUrl: currentServer,
+    localServerUrl: LOCAL_MUSICBRAINZ_API || null,
+    publicServerUrl: PUBLIC_MUSICBRAINZ_API,
     hasFallback: !!LOCAL_MUSICBRAINZ_API,
-    didFallback: localServerFailed,
+    inFallbackMode: localServerFailed,
+    recoveryEnabled: !!LOCAL_MUSICBRAINZ_API,
+    nextHealthCheckIn: timeUntilNextCheck,
     stats: {
       requestCount,
       avgResponseTime: requestCount > 0 ? Math.round(totalResponseTime / requestCount) : 0,
       lastResponseTime,
     },
   };
+}
+
+/**
+ * Manually trigger a recovery check (useful for UI "retry" buttons)
+ * Returns true if recovery was successful
+ */
+export async function forceRecoveryCheck(): Promise<boolean> {
+  if (!LOCAL_MUSICBRAINZ_API) {
+    return false;
+  }
+
+  // Reset the last check time to force an immediate check
+  lastHealthCheckTime = 0;
+
+  const isHealthy = await checkLocalServerHealth();
+
+  if (isHealthy) {
+    console.log('[MusicBrainz] Manual recovery check successful! Switching back to local server.');
+    localServerFailed = false;
+    usingLocalServer = true;
+    currentServer = LOCAL_MUSICBRAINZ_API;
+    return true;
+  }
+
+  console.log('[MusicBrainz] Manual recovery check failed. Staying on public API.');
+  return false;
 }
 
 // Log which server is being used (only in development)
@@ -132,6 +176,68 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Check if the local MusicBrainz server is healthy
+ * Uses a quick artist lookup as a health check
+ */
+async function checkLocalServerHealth(): Promise<boolean> {
+  if (!LOCAL_MUSICBRAINZ_API || healthCheckInProgress) {
+    return false;
+  }
+
+  healthCheckInProgress = true;
+  lastHealthCheckTime = Date.now();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+
+    // Use a simple search request as health check
+    const url = `${LOCAL_MUSICBRAINZ_API}/artist?query=test&fmt=json&limit=1`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    healthCheckInProgress = false;
+  }
+}
+
+/**
+ * Attempt to recover to the local server if it's healthy again
+ * Called periodically when using the fallback public API
+ */
+async function attemptRecovery(): Promise<boolean> {
+  if (!localServerFailed || !LOCAL_MUSICBRAINZ_API) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (now - lastHealthCheckTime < HEALTH_CHECK_INTERVAL_MS) {
+    return false; // Not enough time since last check
+  }
+
+  const isHealthy = await checkLocalServerHealth();
+
+  if (isHealthy) {
+    console.log('[MusicBrainz] Local server recovered! Switching back from public API.');
+    localServerFailed = false;
+    usingLocalServer = true;
+    currentServer = LOCAL_MUSICBRAINZ_API;
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Make a single fetch request to a MusicBrainz server
  */
 async function fetchFromServer<T>(
@@ -172,15 +278,26 @@ async function fetchFromServer<T>(
 }
 
 /**
- * Make a rate-limited request to MusicBrainz API with fallback support
+ * Make a rate-limited request to MusicBrainz API with fallback and auto-recovery
  *
- * If a local server is configured and fails, automatically falls back to the public API.
- * Once fallback occurs, continues using public API for the session.
+ * Behavior:
+ *   1. ALWAYS prefers local server (stonefrog-db01) when configured
+ *   2. Falls back to public MusicBrainz API if local server fails
+ *   3. Periodically checks if local server has recovered (every 30s)
+ *   4. Automatically switches back to local server when it becomes available
  */
 async function mbFetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
   return queueRequest(async () => {
-    // If local server previously failed, go straight to public API
+    // If we're in fallback mode, periodically check if local server has recovered
     if (localServerFailed && LOCAL_MUSICBRAINZ_API) {
+      // Attempt recovery in the background (non-blocking)
+      // This will switch back to local if healthy
+      await attemptRecovery();
+    }
+
+    // Now check which server we should use (may have changed after recovery)
+    if (localServerFailed && LOCAL_MUSICBRAINZ_API) {
+      // Still in fallback mode - use public API
       return fetchFromServer<T>(PUBLIC_MUSICBRAINZ_API, endpoint, params);
     }
 
@@ -198,6 +315,7 @@ async function mbFetch<T>(endpoint: string, params: Record<string, string> = {})
         localServerFailed = true;
         usingLocalServer = false;
         currentServer = PUBLIC_MUSICBRAINZ_API;
+        lastHealthCheckTime = Date.now(); // Start recovery timer
 
         // Retry with public API (will now use rate limiting)
         return fetchFromServer<T>(PUBLIC_MUSICBRAINZ_API, endpoint, params);

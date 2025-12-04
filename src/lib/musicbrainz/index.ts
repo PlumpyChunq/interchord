@@ -7,6 +7,7 @@ export {
   getArtistReleaseGroups,
   buildArtistGraph,
   getServerStatus,
+  forceRecoveryCheck,
 } from './client';
 
 export type { MusicBrainzServerStatus } from './client';
