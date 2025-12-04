@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Get the app URL from environment - defaults to localhost for development
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://127.0.0.1:3000';
+
 /**
  * Spotify OAuth callback handler
  *
@@ -12,9 +15,8 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state');
   const error = searchParams.get('error');
 
-  // Always redirect to 127.0.0.1 to match Spotify's redirect URI config
-  // This ensures localStorage is consistent (localhost and 127.0.0.1 are different origins)
-  const redirectUrl = new URL('http://127.0.0.1:3000/');
+  // Redirect to the app URL (production or localhost)
+  const redirectUrl = new URL(APP_URL);
 
   if (error) {
     // User denied access or other error
