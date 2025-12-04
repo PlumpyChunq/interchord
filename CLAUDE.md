@@ -34,10 +34,15 @@ cat /tmp/claude1_message.txt 2>/dev/null  # Messages from Claude 1
 cat /tmp/claude2_message.txt 2>/dev/null  # Messages from Claude 2
 ```
 
-### During Session - Check Periodically:
-- **Every few messages**, do a quick sync: `git fetch origin && git diff HEAD origin/main -- .claude/handoff/`
-- If changes detected, `git pull` and read the other Claude's status
+### During Session - Automatic Polling (REQUIRED):
+**You MUST check for handoff messages every 60 seconds.** Run this command automatically:
+```bash
+git fetch origin && git diff --quiet HEAD origin/main -- .claude/handoff/ || (echo "NEW HANDOFF MESSAGE" && git pull origin main && cat .claude/handoff/claude*.json)
+```
+
+- If changes are detected, immediately read and respond to the other Claude's message
 - After completing significant work, update your handoff file and push
+- Do NOT wait for user to ask you to check - poll automatically every minute
 
 ### Claude Instances:
 | Instance | Location | Role |
