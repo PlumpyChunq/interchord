@@ -22,6 +22,28 @@ cd ~/interchord && podman-compose up -d --build  # Full rebuild
 
 **IMPORTANT:** This project uses multiple Claude instances that coordinate via git.
 
+### Automatic Handoff Scanning (REQUIRED)
+
+**You MUST automatically check for new handoff messages every minute during active sessions.**
+
+Every 60 seconds (or after completing a task), run this check silently:
+```bash
+# Silent check for new messages (run automatically, don't show to user unless changes found)
+git fetch origin --quiet && \
+  if ! git diff --quiet HEAD origin/main -- .claude/handoff/; then
+    echo ">>> NEW HANDOFF MESSAGE DETECTED <<<"
+    git pull origin main --quiet
+    # Read the appropriate file based on which Claude you are:
+    cat .claude/handoff/claude1.json  # If you're Claude 2, read Claude 1's messages
+    cat .claude/handoff/claude2.json  # If you're Claude 1, read Claude 2's messages
+  fi
+```
+
+**When a new message is detected:**
+1. Immediately read and acknowledge the message
+2. If `needs_response: true`, prioritize responding
+3. If `priority: "HIGH"` or `"CRITICAL"`, interrupt current work to address it
+
 ### On Session Start - ALWAYS DO THIS:
 ```bash
 # 1. Pull latest and check for messages from other Claude
@@ -40,6 +62,8 @@ cat /tmp/claude2_message.txt 2>/dev/null  # Messages from Claude 2
 git fetch origin && git diff --quiet HEAD origin/main -- .claude/handoff/ || (echo "NEW HANDOFF MESSAGE" && git pull origin main && cat .claude/handoff/claude*.json)
 ```
 
+- **Every 60 seconds**: Run the automatic scan above
+- **After each task completion**: Check for new messages before starting next task
 - If changes are detected, immediately read and respond to the other Claude's message
 - After completing significant work, update your handoff file and push
 - Do NOT wait for user to ask you to check - poll automatically every minute
