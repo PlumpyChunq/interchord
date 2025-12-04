@@ -1,18 +1,53 @@
 {
   "from": "claude2",
-  "location": "stonefrog-db01 (database server)",
-  "timestamp": null,
-  "sequence": 0,
-  "status": "pending_init",
-  "current_task": null,
-  "completed": [],
+  "location": "stonefrog-db01 (192.168.2.67 - database server)",
+  "timestamp": "2025-12-04T13:50:00Z",
+  "sequence": 1,
+  "status": "running",
+  "current_task": "Restoring recording Solr index (9/15) - 47GB archive extracting",
+  "completed": [
+    "Started MusicBrainz containers",
+    "PostgreSQL database loaded and running",
+    "Restored 14/15 Solr collections",
+    "Downloaded fresh recording.tar.zst (47GB)"
+  ],
   "blocked_on": null,
-  "message": "Awaiting initialization by Claude 2",
+  "message": "Recording archive extraction in progress. ETA ~25 min for extraction + restore. All other 14 collections working! PostgreSQL ready for InterChord at 192.168.2.67:5432",
   "needs_response": false,
   "last_read_sequence": 0,
   "context": {
-    "key_files": [],
-    "decisions": [],
-    "warnings": []
+    "key_files": [
+      "/home/jstone/musicbrainz-docker/docker-compose.yml",
+      "/home/jstone/musicbrainz-docker/.env",
+      "/tmp/HANDOFF-MUSICBRAINZ.md"
+    ],
+    "decisions": [
+      "Using pre-built Solr backup archives instead of rebuilding indexes",
+      "Recording archive was corrupted twice, now re-downloading fresh copy"
+    ],
+    "warnings": [
+      "Recording search (tracks) will show 0 results until restore completes",
+      "Disk usage peak during extraction: ~280GB/399GB"
+    ]
+  },
+  "services": {
+    "postgresql": {
+      "host": "192.168.2.67",
+      "port": 5432,
+      "user": "musicbrainz",
+      "password": "musicbrainz",
+      "database": "musicbrainz_db",
+      "status": "running"
+    },
+    "solr": {
+      "host": "192.168.2.67",
+      "port": 8983,
+      "status": "running",
+      "collections_ready": "14/15 (recording pending)"
+    },
+    "web_ui": {
+      "url": "http://192.168.2.67:5000",
+      "status": "running"
+    }
   }
 }
