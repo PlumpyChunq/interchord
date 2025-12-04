@@ -5,12 +5,17 @@
 ## Quick Reference
 
 ```bash
-# Development
+# Development (Mac - Claude 1)
 pnpm dev          # Start dev server at http://localhost:3000
 pnpm build        # Production build
 pnpm lint         # Run ESLint
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
+
+# Production (stonefrog-db01 - Claude 2)
+cd ~/interchord && podman-compose logs -f     # View logs
+cd ~/interchord && podman-compose restart     # Restart services
+cd ~/interchord && podman-compose up -d --build  # Full rebuild
 ```
 
 ## Multi-Claude Coordination System
@@ -61,6 +66,250 @@ EOF
 git add .claude/handoff/ && git commit -m "Claude handoff update" && git push
 ```
 
+---
+
+## Production Operations (stonefrog-db01)
+
+### Service Architecture
+
+| Service | Port | Container | Health Check |
+|---------|------|-----------|--------------|
+| InterChord App | 3000 | interchord-app | `curl localhost:3000/api/musicbrainz/health` |
+| User PostgreSQL | 5433 | interchord-db | `pg_isready -h localhost -p 5433` |
+| MusicBrainz API | 5000 | musicbrainz-musicbrainz-1 | `curl localhost:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json` |
+| MusicBrainz DB | 5432 | musicbrainz-db-1 | `pg_isready -h localhost -p 5432` |
+| Solr Search | 8983 | musicbrainz-search-1 | `curl localhost:8983/solr/admin/cores?action=STATUS` |
+
+### Network Topology
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    stonefrog-db01 (192.168.2.67)                  │
+│                                                                   │
+│  ┌─────────────────┐      ┌────────────────────────────────────┐ │
+│  │   InterChord    │      │       MusicBrainz Stack            │ │
+│  │   Container     │─────>│  ┌──────┐ ┌──────┐ ┌────────────┐  │ │
+│  │   :3000         │      │  │ API  │ │  DB  │ │    Solr    │  │ │
+│  └────────┬────────┘      │  │:5000 │ │:5432 │ │   :8983    │  │ │
+│           │               │  └──────┘ └──────┘ └────────────┘  │ │
+│  ┌────────v────────┐      └────────────────────────────────────┘ │
+│  │   User DB       │                                             │
+│  │   :5433         │                                             │
+│  └─────────────────┘                                             │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Container Management (Podman)
+```bash
+# View all containers
+podman ps -a
+
+# View logs (follow mode)
+podman logs -f interchord-app
+podman-compose logs -f
+
+# Restart specific service
+podman-compose restart app
+
+# Full rebuild and deploy
+podman-compose down && podman-compose up -d --build
+
+# Check resource usage
+podman stats --no-stream
+
+# Enter container shell
+podman exec -it interchord-app /bin/sh
+```
+
+### Health Checks (Run These First When Troubleshooting)
+```bash
+# 1. InterChord application health
+curl -s http://localhost:3000/api/musicbrainz/health | jq .
+
+# 2. MusicBrainz API (test artist lookup)
+curl -s "http://localhost:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json" | jq .name
+
+# 3. PostgreSQL databases
+podman exec musicbrainz-db-1 pg_isready -U musicbrainz
+podman exec interchord-db pg_isready -U interchord
+
+# 4. Solr collections (should show 15 cores)
+curl -s "http://localhost:8983/solr/admin/cores?action=STATUS" | jq '.status | keys | length'
+```
+
+### MusicBrainz Database Operations
+```bash
+# Location of MusicBrainz docker-compose
+cd ~/musicbrainz-docker
+
+# View MusicBrainz logs
+podman-compose logs -f
+
+# Restart MusicBrainz stack
+podman-compose restart
+
+# Check Solr index status (15 collections expected)
+curl -s localhost:8983/solr/admin/cores?action=STATUS | jq '.status | keys'
+
+# Direct PostgreSQL access
+podman exec -it musicbrainz-db-1 psql -U musicbrainz musicbrainz_db
+```
+
+---
+
+## Incident Response Runbook
+
+### InterChord Not Responding
+```bash
+# 1. Check if container is running
+podman ps | grep interchord
+
+# 2. Check container logs for errors
+podman logs --tail 100 interchord-app
+
+# 3. Check health endpoint
+curl -v http://localhost:3000/api/musicbrainz/health
+
+# 4. If container crashed, restart
+cd ~/interchord && podman-compose restart app
+
+# 5. If still failing, full rebuild
+cd ~/interchord && podman-compose down && podman-compose up -d --build
+```
+
+### MusicBrainz Search Returns Empty Results
+```bash
+# 1. Check Solr status
+curl -s localhost:8983/solr/admin/cores?action=STATUS | jq '.status | keys | length'
+# Should return 15
+
+# 2. Check specific collection (recording is largest/most likely to fail)
+curl -s "localhost:8983/solr/recording/select?q=*:*&rows=0" | jq .response.numFound
+# Should return millions of records
+
+# 3. If collections missing, check ~/musicbrainz-docker for restore procedures
+# See /tmp/HANDOFF-MUSICBRAINZ.md for Solr backup/restore details
+```
+
+### Database Connection Failures
+```bash
+# 1. Check PostgreSQL is accepting connections
+podman exec musicbrainz-db-1 pg_isready -U musicbrainz
+podman exec interchord-db pg_isready -U interchord
+
+# 2. Check port bindings
+podman port musicbrainz-db-1
+podman port interchord-db
+
+# 3. Test connection from app container
+podman exec interchord-app wget -qO- "http://host.containers.internal:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json"
+```
+
+### High Memory/CPU Usage
+```bash
+# 1. Check container resource usage
+podman stats --no-stream
+
+# 2. Identify heavy container
+podman top <container_id>
+
+# 3. Check host resources
+free -h && df -h
+
+# 4. If Solr using too much memory, restart it
+cd ~/musicbrainz-docker && podman-compose restart search
+```
+
+---
+
+## Environment Variables
+
+### Development (.env.local on Mac)
+```env
+SETLIST_FM_API_KEY=your_key
+NEXT_PUBLIC_SPOTIFY_CLIENT_ID=your_client_id
+NEXT_PUBLIC_SPOTIFY_REDIRECT_URI=http://localhost:3000/api/spotify/callback
+NEXT_PUBLIC_FANART_API_KEY=your_key
+NEXT_PUBLIC_LASTFM_API_KEY=your_key
+```
+
+### Production (.env.production on stonefrog-db01)
+```env
+NODE_ENV=production
+NEXT_PUBLIC_APP_URL=https://interchord.stonefrog.com
+
+# MusicBrainz (local containers - use host.containers.internal for Podman)
+NEXT_PUBLIC_MUSICBRAINZ_API=http://host.containers.internal:5000/ws/2
+MUSICBRAINZ_DB_HOST=host.containers.internal
+MUSICBRAINZ_DB_PORT=5432
+MUSICBRAINZ_DB_USER=musicbrainz
+MUSICBRAINZ_DB_PASSWORD=musicbrainz
+MUSICBRAINZ_DB_NAME=musicbrainz_db
+
+# User Database (container network)
+DATABASE_URL=postgres://interchord:your_password@interchord-db:5433/interchord
+
+# External APIs (same keys as dev)
+SETLIST_FM_API_KEY=your_key
+NEXT_PUBLIC_SPOTIFY_CLIENT_ID=your_client_id
+NEXT_PUBLIC_SPOTIFY_REDIRECT_URI=https://interchord.stonefrog.com/api/spotify/callback
+NEXT_PUBLIC_FANART_API_KEY=your_key
+NEXT_PUBLIC_LASTFM_API_KEY=your_key
+```
+
+> ⚠️ **Important:** `NEXT_PUBLIC_*` variables are **build-time only**. You must rebuild the container (`podman-compose up -d --build`) to change them.
+
+---
+
+## Backup & Recovery
+
+### User Database Backup
+```bash
+# Create backup
+podman exec interchord-db pg_dump -U interchord interchord > ~/backups/interchord-$(date +%Y%m%d).sql
+
+# Restore backup
+podman exec -i interchord-db psql -U interchord interchord < ~/backups/interchord-YYYYMMDD.sql
+```
+
+### MusicBrainz Database
+- Full database dumps in `/home/jstone/musicbrainz-docker/`
+- Solr indexes can be restored from backup archives or rebuilt from DB (slow)
+- See `/tmp/HANDOFF-MUSICBRAINZ.md` for detailed restore procedures
+
+### Recovery Priority
+1. **MusicBrainz PostgreSQL** - Core data, restore first
+2. **InterChord User DB** - User preferences/favorites
+3. **Solr Indexes** - Can rebuild from DB if needed (takes hours)
+
+---
+
+## Logging & Monitoring
+
+### View Logs
+```bash
+# All InterChord logs
+podman-compose logs -f
+
+# Last hour only
+podman logs --since 1h interchord-app
+
+# Filter for errors
+podman logs interchord-app 2>&1 | grep -i error
+
+# Export for analysis
+podman logs interchord-app > /tmp/interchord-logs-$(date +%Y%m%d).txt
+```
+
+### Log Locations
+- Container logs: `podman logs <container>`
+- MusicBrainz logs: `~/musicbrainz-docker/` (via podman-compose)
+- System logs: `journalctl -u podman`
+
+### Future: Structured Logging
+Consider adding Winston/Pino for JSON logs compatible with Grafana Loki or ELK stack.
+
+---
+
 ## Error Handling Policy
 
 **IMPORTANT:** Always address errors immediately when they appear in:
@@ -108,6 +357,7 @@ A music discovery application that visualizes artist relationships through inter
 
 ## Architecture
 
+### Development (Mac - Claude 1)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Frontend (Next.js 16)                         │
@@ -115,27 +365,43 @@ A music discovery application that visualizes artist relationships through inter
 │  │   Artist Search     │  │   Interactive Graph Visualizer  │   │
 │  │   + Favorites       │  │   (Cytoscape.js)                │   │
 │  └─────────────────────┘  └─────────────────────────────────┘   │
-│  ┌─────────────────────┐  ┌─────────────────────────────────┐   │
-│  │   Recent Shows      │  │   Artist Detail Sidebar         │   │
-│  │   (Setlist.fm)      │  │   (Members, Shows, Links)       │   │
-│  └─────────────────────┘  └─────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Next.js API Routes                            │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │   /api/concerts (Setlist.fm proxy - avoids CORS)        │    │
-│  └─────────────────────────────────────────────────────────┘    │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+       ┌──────────┐    ┌──────────┐    ┌──────────┐
+       │MusicBrainz│   │Setlist.fm│    │ Spotify  │
+       │Local:5000 │   │  (API)   │    │  (API)   │
+       └──────────┘    └──────────┘    └──────────┘
+```
+
+### Production (stonefrog-db01 - Claude 2)
+```
+                         INTERNET
+                            │
+                   ┌────────▼────────┐
+                   │   Cloudflare    │  (Phase 2 - Pending)
+                   │ interchord.     │
+                   │ stonefrog.com   │
+                   └────────┬────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────────┐
+│                    stonefrog-db01 (192.168.2.67)                 │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                    InterChord Container                     │ │
+│  │  ┌─────────────────┐  ┌─────────────────────────────────┐  │ │
+│  │  │   Next.js App   │  │    API Routes                   │  │ │
+│  │  │   :3000         │  │  /api/concerts, /api/spotify    │  │ │
+│  │  └────────┬────────┘  └─────────────────────────────────┘  │ │
+│  └───────────┼────────────────────────────────────────────────┘ │
+│              │                                                   │
+│   ┌──────────▼──────────┐    ┌──────────────────────────────┐  │
+│   │   User PostgreSQL   │    │     MusicBrainz Stack        │  │
+│   │   :5433             │    │  API:5000  DB:5432  Solr:8983│  │
+│   │   (favorites/prefs) │    │  (local mirror - no limits!) │  │
+│   └─────────────────────┘    └──────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┴─────────────────────┐
-        ▼                                           ▼
-┌───────────────────────┐               ┌───────────────────────┐
-│     MusicBrainz       │               │     Setlist.fm        │
-│  (artist relations)   │               │   (past concerts)     │
-│   1 req/sec limit     │               │    via API route      │
-└───────────────────────┘               └───────────────────────┘
 ```
 
 ## Tech Stack
@@ -156,10 +422,13 @@ A music discovery application that visualizes artist relationships through inter
 
 | API | Purpose | Auth | Notes |
 |-----|---------|------|-------|
-| MusicBrainz | Artist relationships | User-Agent header | **1 req/sec limit** - implemented with queue |
+| MusicBrainz | Artist relationships | User-Agent header | **Local mirror on stonefrog-db01** - no rate limits! |
 | Setlist.fm | Past concerts | API key in `.env.local` | Server-side proxy to avoid CORS |
+| Spotify | Top/followed artists | OAuth | Import user's music taste |
 | Songkick | Upcoming tour dates | None (search links only) | No API - links to search pages |
 | SeatGeek | Upcoming concerts | Pending approval | Will replace Songkick links |
+
+> **Note:** Production uses a local MusicBrainz mirror (PostgreSQL + Solr on stonefrog-db01), eliminating the 1 req/sec rate limit. Development can use the same local mirror or fall back to the public API.
 
 ## Key Implementation Details
 
@@ -259,13 +528,6 @@ interface Concert {
 }
 ```
 
-## Environment Variables
-
-```env
-# .env.local (required)
-SETLIST_FM_API_KEY=your_api_key_here
-```
-
 ## Coding Conventions
 
 - **'use client'** directive on all components using hooks or browser APIs
@@ -278,11 +540,9 @@ SETLIST_FM_API_KEY=your_api_key_here
 
 1. **Setlist.fm only provides past shows** - No future concert dates. Songkick search links are a workaround until SeatGeek API is approved.
 
-2. **MusicBrainz rate limit** - 1 request/second. The client queues requests automatically, but large graphs take time to load.
+2. **Force layout is static** - COSE calculates positions once; no real-time physics when dragging nodes.
 
-3. **No database** - All data is fetched fresh or cached in localStorage. No user accounts.
-
-4. **Force layout is static** - COSE calculates positions once; no real-time physics when dragging nodes.
+3. **User data in localStorage** - Favorites currently stored client-side. Phase 3 will add server-side PostgreSQL for cross-device sync.
 
 ## Future Improvements
 
@@ -290,30 +550,14 @@ See `PROGRESS.md` for the complete roadmap (Phases 3-7). Key upcoming items:
 
 - [ ] SeatGeek API integration for upcoming concerts (waiting for approval)
 - [ ] Real-time force layout with d3-force
-- [ ] MusicBrainz database mirror (eliminates rate limits)
+- [x] ~~MusicBrainz database mirror~~ ✅ **DONE** - Local mirror on stonefrog-db01
 - [ ] Apple Music integration ($99/year developer program)
 - [ ] PostgreSQL for persistent favorites/user data
+- [ ] Cloudflare Tunnel for public HTTPS access (Phase 2)
 
 ## Development Notes
 
 - Use Playwright MCP for browser testing when needed
 - Confluence documentation: [InterChord Project](https://stonefrog.atlassian.net/wiki/spaces/STONEFROG/pages/1936752642)
-- You are a senior engineer doing a code review for a service that will eventually run in the cloud and scale horizontally.
-I’ll provide you this project’s files.
-
-Goals:
-    •    Easy maintenance and onboarding
-    •    Easy to add new features
-    •    Cloud-ready and scalable (stateless where appropriate, config via env, no hidden local assumptions)
-
-Please:
-    1.    Give a quick overview of the architecture and folder structure.
-    2.    Call out any design smells (tight coupling, god classes, cross-cutting concerns leaking everywhere).
-    3.    Check that configuration, logging, and error handling follow best practices for cloud deployment.
-    4.    Check for test coverage strategy and how easy it is to test units in isolation.
-    5.    Recommend concrete refactors and show small, focused code examples (before/after) where useful.
-    6.    Suggest how to better organize modules so that adding new features is straightforward.
-
-Assume I’ll eventually run this as Docker containers behind a load balancer in <cloud/Kubernetes/etc.>.
-- the /tmp/ dir is wharer Claude 1 and Claude 2 will Communicat
-- the /tmp/ dir is wharer Claude 1 and Claude 2 will Communicate
+- For production operations, see **Production Operations** section above
+- For incident response, see **Incident Response Runbook** section above
