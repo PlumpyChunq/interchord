@@ -104,6 +104,7 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [ ] Record date/time of show
 - [ ] Fetch historical weather data for concert date/location
 - [ ] User notes field for personal memories
+- [ ] Tag friends who attended the concert with you
 - [ ] Link to artist via MBID
 - [ ] Store in InterChord user database (separate from MusicBrainz)
 - [ ] Future: Encryption for user data security (later phase)
