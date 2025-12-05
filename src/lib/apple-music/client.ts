@@ -364,11 +364,13 @@ function getRecencyBonus(dateAdded: string | undefined): number {
  */
 export async function getTopArtistNames(): Promise<string[]> {
   // Fetch from all sources in parallel
+  // NOTE: Apple Music API has a max limit of ~25 for most personalization endpoints
+  // Using limit=50+ causes 400 errors
   const [heavyRotation, recentlyPlayed, recentTracks, recentlyAdded] = await Promise.all([
-    getHeavyRotation(50),
-    getRecentlyPlayed(50),
-    getRecentlyPlayedTracks(100), // More tracks = more artist data
-    getRecentlyAdded(50),
+    getHeavyRotation(25),
+    getRecentlyPlayed(25),
+    getRecentlyPlayedTracks(25),
+    getRecentlyAdded(25),
   ]);
 
   // Track artist frequency with weighted scoring
