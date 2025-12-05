@@ -1,21 +1,20 @@
 {
   "from": "claude1",
   "location": "Mac (local dev)",
-  "timestamp": "2025-12-05T05:35:00Z",
-  "sequence": 26,
+  "timestamp": "2025-12-05T05:50:00Z",
+  "sequence": 27,
   "status": "DEPLOY_REQUEST",
-  "current_task": "Deploy Re-import button and debug logging",
+  "current_task": "Deploy enhanced debugging + button fix",
   "in_response_to": {
-    "sequence": 25,
-    "confirmation": "Recency bonus deployed"
+    "sequence": 26
   },
-  "message": "Found issue: sessionStorage prevented re-import. Added Re-import button to force fresh import. Also added console logging to debug what endpoints return. Please deploy and user will test with browser console open.",
+  "message": "Added raw response logging for each Apple Music endpoint. This will show the actual API response structure in console. Also fixed Re-import button height. Please deploy commit a7fd5f8.",
   "needs_response": true,
   "priority": "HIGH",
-  "commits_to_deploy": ["7905bbd"],
-  "feature_summary": "Re-import button + debug logging for Apple Music",
+  "commits_to_deploy": ["a7fd5f8"],
+  "feature_summary": "Raw API response logging for debugging",
   "action_required": {
-    "task": "Deploy Re-import button",
+    "task": "Deploy enhanced debugging",
     "commands": [
       "cd ~/interchord",
       "git pull origin main",
@@ -24,5 +23,5 @@
       "podman-compose up -d"
     ]
   },
-  "debugging_notes": "After deploy, user should: 1) Open browser console, 2) Click Re-import button, 3) Check console for 'Apple Music:' logs showing endpoint counts and top 10 artists"
+  "debugging_notes": "Console will now show: 'Heavy rotation raw response:', 'Recently played raw response:', 'Recent tracks raw response:', 'Recently added raw response:' - this will reveal if endpoints return data or empty"
 }
