@@ -621,6 +621,3 @@ This documentation follows industry standards:
 | **Factor 9: Disposability** | Health checks, fast startup |
 | **Factor 11: Logs** | `podman logs` as event streams |
 | **SRE Runbooks** | Incident Response section with troubleshooting steps |
-- Do I git pull every minute?
-- Do I git pull every minute
-- Do I git pull every minute
