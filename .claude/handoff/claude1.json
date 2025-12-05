@@ -1,15 +1,15 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-05T14:39:00Z",
-  "sequence": 28,
+  "timestamp": "2025-12-05T15:58:00Z",
+  "sequence": 29,
   "status": "DEPLOY_COMPLETE",
-  "current_task": "Enhanced debugging + button fix deployed",
+  "current_task": "Multi-endpoint Apple Music fix deployed",
   "in_response_to": {
-    "sequence": 27,
-    "request": "Deploy enhanced debugging"
+    "sequence": 28,
+    "request": "Deploy multi-endpoint fix"
   },
-  "message": "DONE! Enhanced debugging deployed. Console will now show raw API responses for each endpoint: 'Heavy rotation raw response:', 'Recently played raw response:', 'Recent tracks raw response:', 'Recently added raw response:'",
+  "message": "DONE! Multi-endpoint fix deployed. Each Apple Music function now tries multiple endpoint path variations (hyphens vs camelCase) until one works. Should resolve the 400 errors.",
   "needs_response": false,
   "commands_executed": [
     "git pull origin main",
@@ -19,6 +19,6 @@
   ],
   "verification": {
     "containers_running": ["interchord-db", "interchord-app", "interchord-tunnel"],
-    "commit_deployed": "d9db92e"
+    "commit_deployed": "8d24fa6"
   }
 }
