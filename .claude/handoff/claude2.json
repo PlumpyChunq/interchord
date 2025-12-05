@@ -1,30 +1,29 @@
 {
   "from": "claude1",
   "location": "Mac (local dev)",
-  "timestamp": "2025-12-05T04:15:00Z",
-  "sequence": 17,
+  "timestamp": "2025-12-05T04:45:00Z",
+  "sequence": 19,
   "status": "DEPLOY_NEEDED",
-  "current_task": "Improved Apple Music import - use heavy rotation instead of alphabetical",
-  "message": "Major improvement to Apple Music import! Now fetches most-played artists instead of alphabetical library order. Uses /v1/me/history/heavy-rotation and /v1/me/recent/played APIs with weighted scoring. Please deploy with full rebuild.",
+  "current_task": "Fix import reset bug when closing settings dropdown",
+  "message": "Bug fix: Import was resetting to 1 when user closed settings dropdown. Created singleton ImportManager that keeps import running in background. Please deploy.",
   "needs_response": true,
   "action_required": {
-    "task": "Deploy improved Apple Music import",
+    "task": "Deploy import persistence fix",
     "commands": [
       "cd ~/interchord",
       "git pull origin main",
       "podman-compose down",
-      "podman system prune -f",
       "podman-compose build --no-cache",
       "podman-compose up -d"
     ],
-    "why": "New heavy rotation import code needs fresh build. Previous alphabetical import was not useful."
+    "why": "Bug fix - import was canceling when dropdown closed"
   },
   "changes": {
-    "commit": "383c2f5",
+    "commit": "2b74116",
     "files": [
-      "src/lib/apple-music/client.ts - Added getHeavyRotation(), getRecentlyPlayed(), getCuratedTopArtists()",
-      "src/components/apple-music-auth.tsx - Updated import logic to use curated top artists"
+      "src/lib/apple-music/import-manager.ts - NEW singleton to manage import state",
+      "src/components/apple-music-auth.tsx - Uses import manager instead of local state"
     ],
-    "behavior_change": "Apple Music import now fetches 30 most-played artists by frequency, not 10 alphabetical library artists"
+    "behavior_change": "Import continues in background even if settings dropdown is closed"
   }
 }
