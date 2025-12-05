@@ -90,6 +90,24 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [ ] Discovery results panel
 - [ ] "Explore connections" mode
 
+#### Artist Biography & Geography (NEW)
+- [ ] Display birthplace, death place, country of origin from MusicBrainz
+- [ ] Interactive map widget in artist detail sidebar (right panel)
+- [ ] Plot birth/death locations on small graphical map
+- [ ] Show life-span dates (birth-death)
+- [ ] Consider Wikidata integration for richer biographical data (spouses, children, etc.)
+
+#### User Concert Memories (NEW)
+- [ ] Upload concert tickets (photos/scans)
+- [ ] Upload photos from shows attended
+- [ ] Store concert location on interactive map
+- [ ] Record date/time of show
+- [ ] Fetch historical weather data for concert date/location
+- [ ] User notes field for personal memories
+- [ ] Link to artist via MBID
+- [ ] Store in InterChord user database (separate from MusicBrainz)
+- [ ] Future: Encryption for user data security (later phase)
+
 #### Concert Integration (Added)
 - [x] Setlist.fm API integration for past concerts
 - [x] Server-side proxy route to avoid CORS
