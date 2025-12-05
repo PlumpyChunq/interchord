@@ -3,9 +3,20 @@
  *
  * Manages the import process in a singleton pattern so it survives
  * component unmounts (e.g., closing settings dropdown).
+ *
+ * IMPORTANT: This directly writes to localStorage instead of using React callbacks
+ * because callbacks become stale when the component unmounts.
  */
 
 import { searchArtists } from '@/lib/musicbrainz/client';
+import {
+  STORAGE_KEYS,
+  STORAGE_EVENTS,
+  getStorageItem,
+  setStorageItem,
+  dispatchStorageEvent,
+} from '@/lib/storage';
+import type { StoredArtist } from '@/lib/favorites/hooks';
 
 type ImportStatus = {
   isImporting: boolean;
@@ -63,12 +74,36 @@ class AppleMusicImportManager {
   }
 
   /**
+   * Get favorites directly from localStorage
+   */
+  private getFavorites(): StoredArtist[] {
+    return getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []) ?? [];
+  }
+
+  /**
+   * Add a favorite directly to localStorage (bypasses React state)
+   */
+  private addFavoriteToStorage(artist: StoredArtist): boolean {
+    const favorites = this.getFavorites();
+
+    // Don't add if already exists
+    if (favorites.some((f) => f.id === artist.id)) {
+      return false;
+    }
+
+    const updated = [...favorites, artist];
+    if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
+      // Dispatch event so React components can update
+      dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Start the import process. If already importing, returns the existing promise.
    */
-  async startImport(
-    addFavorite: (artist: { id: string; name: string; type: string; disambiguation?: string }) => void,
-    getFavorites: () => { id: string }[]
-  ): Promise<void> {
+  async startImport(): Promise<void> {
     // Already imported this session
     if (this.isImportComplete()) {
       return;
@@ -79,14 +114,11 @@ class AppleMusicImportManager {
       return this.importPromise;
     }
 
-    this.importPromise = this.runImport(addFavorite, getFavorites);
+    this.importPromise = this.runImport();
     return this.importPromise;
   }
 
-  private async runImport(
-    addFavorite: (artist: { id: string; name: string; type: string; disambiguation?: string }) => void,
-    getFavorites: () => { id: string }[]
-  ): Promise<void> {
+  private async runImport(): Promise<void> {
     this.setStatus({
       isImporting: true,
       message: 'Fetching your most played music...',
@@ -137,10 +169,18 @@ class AppleMusicImportManager {
 
           if (mbResults.length > 0) {
             const mbArtist = mbResults[0];
-            const favorites = getFavorites();
-            const alreadyFavorite = favorites.some((f) => f.id === mbArtist.id);
-            if (!alreadyFavorite) {
-              addFavorite(mbArtist);
+
+            // Create stored artist object
+            const storedArtist: StoredArtist = {
+              id: mbArtist.id,
+              name: mbArtist.name,
+              type: mbArtist.type,
+              country: mbArtist.country,
+              genres: mbArtist.genres,
+            };
+
+            // Add directly to localStorage (survives component unmount!)
+            if (this.addFavoriteToStorage(storedArtist)) {
               imported++;
             }
           }

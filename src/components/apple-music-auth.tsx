@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Music, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppleMusicAuth } from '@/lib/apple-music';
-import { useFavorites } from '@/lib/favorites/hooks';
 import { importManager } from '@/lib/apple-music/import-manager';
 
 interface AppleMusicAuthProps {
@@ -13,7 +12,6 @@ interface AppleMusicAuthProps {
 
 export function AppleMusicAuth({ onImportComplete }: AppleMusicAuthProps) {
   const { isAuthorized, isLoading, error, connect, disconnect } = useAppleMusicAuth();
-  const { addFavorite, favorites } = useFavorites();
   const [importStatus, setImportStatus] = useState(importManager.getStatus());
 
   // Subscribe to import manager status updates
@@ -31,13 +29,10 @@ export function AppleMusicAuth({ onImportComplete }: AppleMusicAuthProps) {
   // Trigger import after authorization (uses singleton, survives unmount)
   useEffect(() => {
     if (isAuthorized && !importManager.isImportComplete() && !importManager.isImporting()) {
-      // Pass callbacks that the manager will use
-      importManager.startImport(
-        addFavorite,
-        () => favorites // Get fresh favorites list each time
-      );
+      // No callbacks needed - import manager writes directly to localStorage
+      importManager.startImport();
     }
-  }, [isAuthorized, addFavorite, favorites]);
+  }, [isAuthorized]);
 
   const handleConnect = async () => {
     await connect();
