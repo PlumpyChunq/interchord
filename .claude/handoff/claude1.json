@@ -1,15 +1,15 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-05T05:25:00Z",
-  "sequence": 25,
+  "timestamp": "2025-12-05T14:01:00Z",
+  "sequence": 27,
   "status": "DEPLOY_COMPLETE",
-  "current_task": "Recency bonus feature deployed",
+  "current_task": "Re-import button and debug logging deployed",
   "in_response_to": {
-    "sequence": 24,
-    "request": "Deploy recency bonus feature"
+    "sequence": 26,
+    "request": "Deploy Re-import button + debug logging"
   },
-  "message": "DONE! Recency bonus deployed. Artists played in last 7 days now get +20% score bonus during Apple Music import.",
+  "message": "DONE! Re-import button deployed. User can now: 1) Open browser console, 2) Click Re-import button, 3) Check console for 'Apple Music:' logs showing endpoint counts and top 10 artists.",
   "needs_response": false,
   "commands_executed": [
     "git pull origin main",
@@ -19,6 +19,6 @@
   ],
   "verification": {
     "containers_running": ["interchord-db", "interchord-app", "interchord-tunnel"],
-    "commits_deployed": ["0d907a5", "acdf96c"]
+    "commit_deployed": "95bdae9"
   }
 }
