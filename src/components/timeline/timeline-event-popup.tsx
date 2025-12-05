@@ -115,28 +115,43 @@ export function TimelineEventPopup({ event, position, onClose }: TimelineEventPo
         </div>
 
         {/* Actions */}
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
-          {event.externalUrl && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex flex-col gap-2">
+          {/* Apple Music button for albums */}
+          {event.type === 'album' && event.artistName && (
             <a
-              href={event.externalUrl}
+              href={`https://music.apple.com/us/search?term=${encodeURIComponent(event.artistName + ' ' + event.title)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+              className="flex-1 text-center px-3 py-2 text-xs font-medium text-white rounded transition-colors flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(180deg, #fc3c44 0%, #e91e63 100%)' }}
             >
-              View Details
-              <ExternalLinkIcon className="w-3 h-3 inline-block ml-1" />
+              <AppleMusicIcon className="w-4 h-4" />
+              Open in Apple Music
             </a>
           )}
-          {event.relatedArtistIds && event.relatedArtistIds.length > 0 && (
-            <button
-              onClick={() => {
-                // This will be handled by the parent component
-              }}
-              className="flex-1 text-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
-            >
-              Highlight in Graph
-            </button>
-          )}
+          <div className="flex gap-2">
+            {event.externalUrl && (
+              <a
+                href={event.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+              >
+                MusicBrainz
+                <ExternalLinkIcon className="w-3 h-3 inline-block ml-1" />
+              </a>
+            )}
+            {event.relatedArtistIds && event.relatedArtistIds.length > 0 && (
+              <button
+                onClick={() => {
+                  // This will be handled by the parent component
+                }}
+                className="flex-1 text-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+              >
+                Highlight in Graph
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -177,6 +192,19 @@ function ExternalLinkIcon({ className }: { className?: string }) {
         strokeWidth={2}
         d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
       />
+    </svg>
+  );
+}
+
+function AppleMusicIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.401-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03c.525 0 1.048-.034 1.57-.1.823-.106 1.597-.35 2.296-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.042-1.785-.56-2.075-1.465-.283-.882.078-1.906.92-2.35a2.916 2.916 0 011.234-.378c.428-.036.856-.067 1.283-.123.258-.035.392-.173.42-.434.006-.06.007-.12.007-.18V9.433c0-.146-.025-.196-.175-.222a55.42 55.42 0 00-.858-.135c-.752-.116-1.505-.227-2.257-.345-.695-.11-1.39-.225-2.085-.332-.098-.015-.15.017-.177.11-.004.013-.007.025-.007.038v6.96c0 .45-.044.894-.215 1.313-.278.68-.762 1.132-1.468 1.32-.378.1-.763.145-1.155.148-.853.003-1.627-.47-1.957-1.27-.362-.876-.055-1.94.79-2.467.39-.243.822-.352 1.275-.396.464-.046.93-.076 1.393-.13.265-.032.393-.164.424-.43.007-.06.006-.12.006-.18V6.793c0-.198.03-.303.227-.344l5.828-1.153c.61-.12 1.222-.235 1.833-.355.27-.053.343.03.343.3v4.873z" />
     </svg>
   );
 }
