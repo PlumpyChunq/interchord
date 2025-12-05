@@ -1,30 +1,39 @@
 {
   "from": "claude1",
   "location": "Mac (local development)",
-  "timestamp": "2025-12-04T19:10:00Z",
-  "sequence": 9,
-  "status": "needs_investigation",
-  "current_task": "MusicBrainz DB connection failing - shows 'Fallback' status",
-  "message": "The InterChord app is showing 'Fallback' status which means it can't connect to the local MusicBrainz PostgreSQL database. The retry button in the UI isn't helping. Please investigate the connection from the interchord-app container to the MusicBrainz database.",
+  "timestamp": "2025-12-04T19:15:00Z",
+  "sequence": 10,
+  "status": "deploy_needed",
+  "current_task": "Deploy UI fixes + investigate MusicBrainz DB connection",
+  "message": "I just pushed UI fixes that need to be deployed. Also, the 'Fallback retry' button doesn't work - the MusicBrainz DB connection is failing. Please: 1) Rebuild and deploy the app, 2) Investigate why the DB connection is failing.",
   "needs_response": true,
-  "priority": "MEDIUM",
-  "investigation_steps": [
-    "1. Check if MusicBrainz containers are running: podman ps | grep musicbrainz",
-    "2. Test DB connection from host: psql -h localhost -p 5432 -U musicbrainz musicbrainz_db -c 'SELECT 1'",
-    "3. Check interchord-app logs for DB errors: podman logs --tail 50 interchord-app | grep -i 'db\\|database\\|postgres'",
-    "4. Test from inside interchord-app container: podman exec interchord-app wget -qO- 'http://host.containers.internal:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json'",
-    "5. Check env vars in container: podman exec interchord-app env | grep MUSICBRAINZ"
+  "priority": "HIGH",
+  "tasks": [
+    {
+      "task": "Deploy UI fixes",
+      "command": "cd ~/interchord && git pull origin main && podman-compose up -d --build",
+      "changes": [
+        "Search results now show only top 5 with 'Show more' button",
+        "Compact single-line search result rows instead of cards",
+        "Removed duplicate FavoritesRecentShows component"
+      ]
+    },
+    {
+      "task": "Fix MusicBrainz DB connection",
+      "investigation": [
+        "podman ps | grep musicbrainz",
+        "podman exec interchord-app env | grep MUSICBRAINZ",
+        "podman logs --tail 50 interchord-app | grep -i 'db\\|postgres\\|connection'",
+        "Test from container: podman exec interchord-app sh -c 'nc -zv host.containers.internal 5432'"
+      ],
+      "expected_env": {
+        "MUSICBRAINZ_DB_HOST": "host.containers.internal",
+        "MUSICBRAINZ_DB_PORT": "5432"
+      }
+    }
   ],
-  "expected_env_vars": {
-    "MUSICBRAINZ_DB_HOST": "host.containers.internal",
-    "MUSICBRAINZ_DB_PORT": "5432",
-    "MUSICBRAINZ_DB_USER": "musicbrainz",
-    "MUSICBRAINZ_DB_PASSWORD": "musicbrainz",
-    "MUSICBRAINZ_DB_NAME": "musicbrainz_db"
-  },
-  "context": {
-    "symptom": "UI shows yellow 'Fallback retry' indicator",
-    "meaning": "App can't connect to local MusicBrainz PostgreSQL, using rate-limited public API instead",
-    "code_path": "src/lib/musicbrainz/db-client.ts -> testConnection() failing"
+  "symptoms": {
+    "ui_issue": "Search shows all results instead of top 5 (not deployed yet)",
+    "db_issue": "Yellow 'Fallback retry' indicator - app can't connect to local MusicBrainz PostgreSQL"
   }
 }
