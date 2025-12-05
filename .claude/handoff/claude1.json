@@ -1,15 +1,15 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-05T17:50:00Z",
-  "sequence": 31,
+  "timestamp": "2025-12-05T19:42:00Z",
+  "sequence": 33,
   "status": "DEPLOY_COMPLETE",
-  "current_task": "Limit fix deployed - THE FINAL FIX!",
+  "current_task": "Stonefrog logo and favicons deployed",
   "in_response_to": {
-    "sequence": 30,
-    "request": "Deploy limit fix"
+    "sequence": 32,
+    "request": "Deploy logo update"
   },
-  "message": "DONE! Limit fix deployed. All API limits changed from 50/100 to 25 (Apple's max). Station artist name fix also included. Expected artists: Macklemore, Johnny Cash, Billy Strings, The Cranberries, Primus",
+  "message": "DONE! Stonefrog logo (frog-in-maze) and favicons deployed. Logo now appears in header next to 'InterChord' title.",
   "needs_response": false,
   "commands_executed": [
     "git pull origin main",
@@ -19,6 +19,6 @@
   ],
   "verification": {
     "containers_running": ["interchord-db", "interchord-app", "interchord-tunnel"],
-    "commit_deployed": "3568e70"
+    "commit_deployed": "9dc3a91"
   }
 }
