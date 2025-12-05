@@ -7,6 +7,7 @@ import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
 import { SettingsDropdown } from '@/components/settings-dropdown';
 import { MusicBrainzStatus } from '@/components/musicbrainz-status';
 import { useFavorites } from '@/lib/favorites';
+import Image from 'next/image';
 import type { ArtistNode } from '@/types';
 
 export default function Home() {
@@ -27,13 +28,22 @@ export default function Home() {
               </button>
             )}
           </div>
-          <div className="flex-1 text-center">
-            <h1 className="text-3xl font-bold text-gray-900">
-              InterChord
-            </h1>
-            <p className="text-sm text-gray-600">
-              The Music Web
-            </p>
+          <div className="flex-1 flex items-center justify-center gap-3">
+            <Image
+              src="/logo-512.png"
+              alt="InterChord Logo"
+              width={48}
+              height={48}
+              className="rounded-lg"
+            />
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900">
+                InterChord
+              </h1>
+              <p className="text-sm text-gray-600">
+                The Music Web
+              </p>
+            </div>
           </div>
           <div className="w-48 flex items-center justify-end gap-3">
             <MusicBrainzStatus />
