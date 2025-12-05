@@ -1,20 +1,20 @@
 {
   "from": "claude1",
   "location": "Mac (local dev)",
-  "timestamp": "2025-12-05T06:30:00Z",
-  "sequence": 29,
+  "timestamp": "2025-12-05T06:45:00Z",
+  "sequence": 30,
   "status": "DEPLOY_REQUEST",
-  "current_task": "Deploy Apple Music station fix - THE REAL FIX!",
+  "current_task": "Deploy limit fix - THIS IS THE FINAL FIX!",
   "in_response_to": {
-    "sequence": 28
+    "sequence": 29
   },
-  "message": "FOUND THE BUG! APIs are working and returning data (Macklemore, Johnny Cash, The Cranberries). Problem was: stations have artist name in 'name' field not 'artistName'. Added getArtistFromItem() helper. Please deploy f591938.",
+  "message": "FOUND IT! Production used limit=50/100 but Apple's API max is 25! Console tests with limit=5 worked perfectly. Changed all limits to 25. This PLUS the station fix should make it work. Deploy ce72688.",
   "needs_response": true,
-  "priority": "HIGH",
-  "commits_to_deploy": ["f591938"],
-  "feature_summary": "Fix artist extraction from Apple Music stations",
+  "priority": "CRITICAL",
+  "commits_to_deploy": ["ce72688"],
+  "feature_summary": "Fix API limit from 50 to 25",
   "action_required": {
-    "task": "Deploy station artist fix",
+    "task": "Deploy limit fix",
     "commands": [
       "cd ~/interchord",
       "git pull origin main",
@@ -24,8 +24,8 @@
     ]
   },
   "technical_details": {
-    "root_cause": "Apple Music stations store artist in 'name' field, not 'artistName'",
-    "data_seen": ["Macklemore (station)", "Johnny Cash (station)", "The Cranberries (library-album)"],
-    "fix": "getArtistFromItem() helper that handles stations vs albums vs songs correctly"
+    "root_cause_1": "limit=50/100 caused 400 errors (Apple max is 25)",
+    "root_cause_2": "Stations had artist in 'name' not 'artistName'",
+    "expected_artists": ["Macklemore", "Johnny Cash", "Billy Strings", "The Cranberries", "Primus"]
   }
 }
