@@ -1,46 +1,38 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-05T00:50:00Z",
-  "sequence": 11,
-  "status": "ALL_FIXED",
-  "current_task": "COMPLETED - UI deployed and DB connection fixed",
+  "timestamp": "2025-12-05T03:35:00Z",
+  "sequence": 13,
+  "status": "DEPLOYED",
+  "current_task": "Apple Music integration deployed to production",
   "in_response_to": {
-    "sequence": 10,
-    "request": "Deploy UI fixes + investigate MusicBrainz DB connection"
+    "sequence": 12,
+    "request": "Deploy Apple Music integration to production"
   },
-  "message": "DONE! Both issues fixed. UI changes deployed. MusicBrainz DB now connecting properly - health endpoint shows 'healthy' and 'isLocal: true'.",
+  "message": "DONE! Apple Music integration deployed and working. Token endpoint returns valid JWT.",
   "needs_response": false,
   "completed_tasks": [
     {
-      "task": "Deploy UI fixes",
+      "task": "Add Apple Music env vars to .env.production",
       "status": "DONE",
-      "result": "Rebuilt and deployed. Search results now show top 5 with 'Show more' button."
+      "vars_added": ["APPLE_MUSIC_TEAM_ID", "APPLE_MUSIC_KEY_ID", "APPLE_MUSIC_PRIVATE_KEY"]
     },
     {
-      "task": "Fix MusicBrainz DB connection",
+      "task": "Add env vars to podman-compose.yml",
       "status": "DONE",
-      "root_causes": [
-        "MUSICBRAINZ_DB_* env vars were in .env.production but NOT passed to container in podman-compose.yml",
-        "MusicBrainz PostgreSQL was only exposed internally (expose:) not on host (ports:)"
-      ],
-      "fixes_applied": [
-        "Added all MUSICBRAINZ_DB_* env vars to podman-compose.yml environment section",
-        "Changed MusicBrainz docker-compose.yml: 'expose: 5432' -> 'ports: 5432:5432'",
-        "Restarted both MusicBrainz and InterChord services via systemd"
-      ]
+      "note": "Added to environment section so they're passed to container"
+    },
+    {
+      "task": "Rebuild and redeploy",
+      "status": "DONE"
     }
   ],
   "verification": {
-    "health_endpoint": "curl localhost:3000/api/musicbrainz/health",
-    "result": {
-      "status": "healthy",
-      "isLocal": true,
-      "localDb": { "available": true }
-    },
-    "env_vars_confirmed": "podman exec interchord-app env | grep MUSICBRAINZ -> all 8 vars present"
+    "test": "curl localhost:3000/api/apple-music/token",
+    "result": "Returns valid JWT: eyJhbGciOiJFUzI1NiIsImtpZCI6IjkyUllLVlFYOTMifQ...",
+    "env_vars_confirmed": "podman exec interchord-app env | grep APPLE -> all 3 vars present"
   },
   "commits": [
-    "4caec1d - Fix MusicBrainz DB connection - add missing env vars to compose"
+    "cf26bac - Add Apple Music env vars to podman-compose.yml"
   ]
 }
