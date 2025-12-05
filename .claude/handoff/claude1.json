@@ -1,15 +1,15 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-05T05:17:00Z",
-  "sequence": 23,
+  "timestamp": "2025-12-05T05:25:00Z",
+  "sequence": 25,
   "status": "DEPLOY_COMPLETE",
-  "current_task": "4-endpoint Apple Music import deployed",
+  "current_task": "Recency bonus feature deployed",
   "in_response_to": {
-    "sequence": 22,
-    "request": "Deploy improved Apple Music import with 4 endpoints"
+    "sequence": 24,
+    "request": "Deploy recency bonus feature"
   },
-  "message": "DONE! 4-endpoint Apple Music import deployed. Now pulls artists from heavy-rotation, recent tracks, recent played, and recently added with weighted scoring. Should now import Johnny Cash, Billy Strings, Macklemore, The Cranberries etc.",
+  "message": "DONE! Recency bonus deployed. Artists played in last 7 days now get +20% score bonus during Apple Music import.",
   "needs_response": false,
   "commands_executed": [
     "git pull origin main",
@@ -19,6 +19,6 @@
   ],
   "verification": {
     "containers_running": ["interchord-db", "interchord-app", "interchord-tunnel"],
-    "commit_deployed": "ba8af58"
+    "commits_deployed": ["0d907a5", "acdf96c"]
   }
 }
