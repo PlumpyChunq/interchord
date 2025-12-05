@@ -217,78 +217,124 @@ interface AppleMusicItem {
 
 /**
  * Get user's heavy rotation (most frequently played)
+ * Tries multiple endpoint variations as Apple's API has inconsistent naming
  */
 export async function getHeavyRotation(limit: number = 25): Promise<AppleMusicItem[]> {
   const music = await ensureAuthorized();
 
-  try {
-    const response = await music.api.music<{ data: AppleMusicItem[] }>(
-      '/v1/me/history/heavy-rotation',
-      { limit }
-    );
-    console.log('Heavy rotation raw response:', JSON.stringify(response.data).slice(0, 500));
-    return response.data.data || [];
-  } catch (error) {
-    console.error('Error fetching heavy rotation:', error);
-    return [];
+  // Try different endpoint variations
+  const endpoints = [
+    '/v1/me/history/heavy-rotation',
+    '/v1/me/heavy-rotation',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await music.api.music<{ data: AppleMusicItem[] }>(
+        endpoint,
+        { limit }
+      );
+      console.log(`Heavy rotation (${endpoint}) raw response:`, JSON.stringify(response.data).slice(0, 500));
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.warn(`Heavy rotation endpoint ${endpoint} failed:`, error);
+    }
   }
+
+  return [];
 }
 
 /**
  * Get user's recently played items (albums, playlists, stations)
+ * Tries multiple endpoint variations as Apple's API has inconsistent naming
  */
 export async function getRecentlyPlayed(limit: number = 25): Promise<AppleMusicItem[]> {
   const music = await ensureAuthorized();
 
-  try {
-    const response = await music.api.music<{ data: AppleMusicItem[] }>(
-      '/v1/me/recent/played',
-      { limit }
-    );
-    console.log('Recently played raw response:', JSON.stringify(response.data).slice(0, 500));
-    return response.data.data || [];
-  } catch (error) {
-    console.error('Error fetching recently played:', error);
-    return [];
+  const endpoints = [
+    '/v1/me/recent/played',
+    '/v1/me/history/recent',
+    '/v1/me/recentPlayed',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await music.api.music<{ data: AppleMusicItem[] }>(
+        endpoint,
+        { limit }
+      );
+      console.log(`Recently played (${endpoint}) raw response:`, JSON.stringify(response.data).slice(0, 500));
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.warn(`Recently played endpoint ${endpoint} failed:`, error);
+    }
   }
+
+  return [];
 }
 
 /**
  * Get user's recently played tracks (individual songs)
+ * Tries multiple endpoint variations as Apple's API has inconsistent naming
  */
 export async function getRecentlyPlayedTracks(limit: number = 25): Promise<AppleMusicItem[]> {
   const music = await ensureAuthorized();
 
-  try {
-    const response = await music.api.music<{ data: AppleMusicItem[] }>(
-      '/v1/me/recent/played/tracks',
-      { limit }
-    );
-    console.log('Recent tracks raw response:', JSON.stringify(response.data).slice(0, 500));
-    return response.data.data || [];
-  } catch (error) {
-    console.error('Error fetching recently played tracks:', error);
-    return [];
+  const endpoints = [
+    '/v1/me/recent/played/tracks',
+    '/v1/me/recentPlayed/tracks',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await music.api.music<{ data: AppleMusicItem[] }>(
+        endpoint,
+        { limit }
+      );
+      console.log(`Recent tracks (${endpoint}) raw response:`, JSON.stringify(response.data).slice(0, 500));
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.warn(`Recent tracks endpoint ${endpoint} failed:`, error);
+    }
   }
+
+  return [];
 }
 
 /**
  * Get user's recently added items to library
+ * Tries multiple endpoint variations as Apple's API has inconsistent naming
  */
 export async function getRecentlyAdded(limit: number = 25): Promise<AppleMusicItem[]> {
   const music = await ensureAuthorized();
 
-  try {
-    const response = await music.api.music<{ data: AppleMusicItem[] }>(
-      '/v1/me/library/recently-added',
-      { limit }
-    );
-    console.log('Recently added raw response:', JSON.stringify(response.data).slice(0, 500));
-    return response.data.data || [];
-  } catch (error) {
-    console.error('Error fetching recently added:', error);
-    return [];
+  const endpoints = [
+    '/v1/me/library/recently-added',
+    '/v1/me/library/recentlyAdded',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await music.api.music<{ data: AppleMusicItem[] }>(
+        endpoint,
+        { limit }
+      );
+      console.log(`Recently added (${endpoint}) raw response:`, JSON.stringify(response.data).slice(0, 500));
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.warn(`Recently added endpoint ${endpoint} failed:`, error);
+    }
   }
+
+  return [];
 }
 
 /**
