@@ -136,6 +136,16 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [ ] Audio samples/previews
 - [ ] Festival performance recordings
 
+#### Natural Language Search (NEW)
+- [ ] Parse complex search queries like "butthole surfers @ 9:30 club in DC"
+- [ ] Extract entities: artist, venue, location, date
+- [ ] Search across multiple data sources (MusicBrainz, Setlist.fm, user memories)
+- [ ] Venue-based discovery: "who played at Red Rocks in 1995"
+- [ ] Location-based discovery: "shows in Austin TX 1990-1999"
+- [ ] Cross-reference user concert memories with query
+- [ ] Fuzzy matching for venue names and locations
+- [ ] Date range parsing: "last summer", "in the 90s", "2015"
+
 ---
 
 ## Upcoming
