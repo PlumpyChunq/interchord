@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { useSidebarPreferences, type SectionId } from '@/lib/sidebar';
 import { RecentConcerts } from '@/components/recent-concerts';
+import { ArtistBiography } from '@/components/artist-biography';
 import { useStreamingPreference } from '@/lib/streaming';
 import { StreamingSelector } from '@/components/streaming-selector';
 import type { ArtistNode, ArtistRelationship, TimelineEvent } from '@/types';
@@ -328,6 +329,15 @@ export function SidebarSections({
   // Build sections array with content
   type SectionData = { id: SectionId; title: string; count?: number; content: React.ReactNode };
   const allSections: SectionData[] = [];
+
+  // Add biography section (only for person artists, not groups)
+  if (artist.type === 'person') {
+    allSections.push({
+      id: 'biography',
+      title: 'Biography',
+      content: <ArtistBiography mbid={artist.id} artistName={artist.name} />,
+    });
+  }
 
   // Add relationship sections
   for (const [type, items] of relationshipGroups) {
