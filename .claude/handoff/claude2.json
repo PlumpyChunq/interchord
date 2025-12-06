@@ -1,31 +1,59 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-06T03:02:00Z",
-  "sequence": 36,
-  "status": "DEPLOY_COMPLETE",
-  "current_task": "Map widget with artist geography deployed",
+  "timestamp": "2025-12-06T03:15:00Z",
+  "sequence": 38,
+  "status": "COMPLETED",
+  "current_task": "Container auto-start configuration complete",
   "in_response_to": {
-    "from_claude1_handoff": true,
-    "request": "Deploy map widget improvements"
+    "from_claude1_sequence": 37,
+    "request": "Configure container auto-start on reboot"
   },
-  "message": "DONE! Major feature deployed - Interactive map widget for artist geography. Includes: band member origins map, fullscreen modal with hover popups, band info panel, bidirectional hover highlighting, auto-zoom to fit markers. New deps: leaflet, react-leaflet.",
+  "message": "SUCCESS! Auto-start configuration complete. All services will now start automatically on server reboot. Enabled linger for jstone user and verified systemd services are properly configured and enabled.",
   "needs_response": false,
-  "commands_executed": [
-    "git pull origin main",
-    "podman-compose down",
-    "podman-compose build --no-cache",
-    "podman-compose up -d"
+  "priority": "NORMAL",
+  "completed_tasks": [
+    "Enabled linger for jstone user (sudo loginctl enable-linger jstone)",
+    "Verified Linger=yes is active",
+    "Confirmed systemd service files already existed in ~/.config/systemd/user/",
+    "Confirmed both services already enabled (interchord.service, musicbrainz.service)",
+    "Stopped manually-started InterChord containers",
+    "Restarted InterChord via systemd to ensure proper systemd management",
+    "Verified all 9 containers running and healthy"
   ],
-  "verification": {
-    "containers_running": ["interchord-db", "interchord-app", "interchord-tunnel"],
-    "commit_deployed": "902acce",
-    "new_files": [
-      "src/components/artist-biography.tsx",
-      "src/components/artist-map.tsx",
-      "src/lib/wikidata/client.ts",
-      "src/lib/wikidata/hooks.ts",
-      "src/lib/wikidata/types.ts"
-    ]
-  }
+  "configuration_summary": {
+    "linger_enabled": true,
+    "services": {
+      "interchord.service": {
+        "enabled": true,
+        "status": "active (running)",
+        "depends_on": "musicbrainz.service"
+      },
+      "musicbrainz.service": {
+        "enabled": true,
+        "status": "active (running)",
+        "uptime": "26+ hours"
+      }
+    },
+    "service_files_location": "~/.config/systemd/user/",
+    "boot_sequence": "network-online.target → musicbrainz.service → interchord.service"
+  },
+  "running_containers": [
+    "musicbrainz-docker_db_1 (Up 26 hours)",
+    "musicbrainz-docker_search_1 (Up 26 hours)",
+    "musicbrainz-docker_mq_1 (Up 26 hours)",
+    "musicbrainz-docker_redis_1 (Up 26 hours)",
+    "musicbrainz-docker_indexer_1 (Up 26 hours)",
+    "musicbrainz-docker_musicbrainz_1 (Up 26 hours)",
+    "interchord-db (healthy)",
+    "interchord-app (healthy)",
+    "interchord-tunnel (running)"
+  ],
+  "health_check": {
+    "endpoint": "http://localhost:3000/api/musicbrainz/health",
+    "result": "healthy",
+    "localDb": "available",
+    "api": "available"
+  },
+  "notes": "The systemd services were already configured and enabled in a previous session. The only missing piece was linger (required for rootless podman to start containers without user login). Now linger is enabled, so on reboot: systemd will start user services for jstone → musicbrainz.service starts first → interchord.service starts after (due to Requires= dependency)."
 }
