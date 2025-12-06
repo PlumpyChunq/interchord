@@ -264,6 +264,8 @@ function formatDate(dateStr?: string): string | null {
 function MapContent({ locations, showTravelPath, enableScrollZoom = false, highlightedArtistName, onHoverArtist, isModal = false }: MapContentProps) {
   const bounds = useMemo(() => calculateBounds(locations), [locations]);
   const markerRefs = useRef<Map<string, LeafletMarker>>(new Map());
+  const closeTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const isMouseInPopupRef = useRef<Set<string>>(new Set());
 
   // Create polyline path through locations in order (only for single artist)
   const pathCoordinates = useMemo(() => {
@@ -337,6 +339,12 @@ function MapContent({ locations, showTravelPath, enableScrollZoom = false, highl
                 }
                 // Auto-open popup on hover in modal mode
                 if (isModal) {
+                  // Clear any pending close timeout
+                  const existingTimeout = closeTimeoutRef.current.get(markerId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    closeTimeoutRef.current.delete(markerId);
+                  }
                   e.target.openPopup();
                 }
               },
@@ -344,14 +352,52 @@ function MapContent({ locations, showTravelPath, enableScrollZoom = false, highl
                 if (onHoverArtist) {
                   onHoverArtist(null);
                 }
-                // Auto-close popup on mouse out in modal mode
+                // Delayed close popup on mouse out in modal mode
+                // This gives user time to move mouse into the popup
                 if (isModal) {
-                  e.target.closePopup();
+                  const timeout = setTimeout(() => {
+                    // Only close if mouse is not in the popup
+                    if (!isMouseInPopupRef.current.has(markerId)) {
+                      e.target.closePopup();
+                    }
+                    closeTimeoutRef.current.delete(markerId);
+                  }, 300); // 300ms delay to allow moving to popup
+                  closeTimeoutRef.current.set(markerId, timeout);
                 }
               },
             }}
           >
-            <Popup>
+            <Popup
+              eventHandlers={isModal ? {
+                add: (e) => {
+                  // Add mouse event listeners to the popup container
+                  const popupEl = e.target.getElement();
+                  if (popupEl) {
+                    popupEl.addEventListener('mouseenter', () => {
+                      isMouseInPopupRef.current.add(markerId);
+                      // Clear any pending close timeout
+                      const existingTimeout = closeTimeoutRef.current.get(markerId);
+                      if (existingTimeout) {
+                        clearTimeout(existingTimeout);
+                        closeTimeoutRef.current.delete(markerId);
+                      }
+                    });
+                    popupEl.addEventListener('mouseleave', () => {
+                      isMouseInPopupRef.current.delete(markerId);
+                      // Get the marker and close its popup after a delay
+                      const marker = markerRefs.current.get(markerId);
+                      if (marker) {
+                        const timeout = setTimeout(() => {
+                          marker.closePopup();
+                          closeTimeoutRef.current.delete(markerId);
+                        }, 200);
+                        closeTimeoutRef.current.set(markerId, timeout);
+                      }
+                    });
+                  }
+                },
+              } : undefined}
+            >
               {/* Artist name */}
               {location.artistName && (
                 <div className="text-base font-bold text-blue-600 mb-1">{location.artistName}</div>
