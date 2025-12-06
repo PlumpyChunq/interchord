@@ -6,7 +6,7 @@ import { useSidebarPreferences, type SectionId } from '@/lib/sidebar';
 import { RecentConcerts } from '@/components/recent-concerts';
 import { ArtistBiography } from '@/components/artist-biography';
 import { ArtistMap } from '@/components/artist-map';
-import { useArtistBio } from '@/lib/wikidata';
+import { useArtistBio, useMultipleArtistBios } from '@/lib/wikidata';
 import { useStreamingPreference } from '@/lib/streaming';
 import { StreamingSelector } from '@/components/streaming-selector';
 import type { ArtistNode, ArtistRelationship, TimelineEvent } from '@/types';
@@ -76,9 +76,24 @@ export function SidebarSections({
     return found?.type === 'person' ? found : null;
   }, [selectedNodeId, artist.id, relatedArtists]);
 
+  // Get all person members for band map view
+  const memberPersonIds = useMemo(() => {
+    if (artist.type !== 'group') return [];
+    return relatedArtists
+      .filter(a => a.type === 'person')
+      .map(a => a.id);
+  }, [artist.type, relatedArtists]);
+
   // Fetch artist bio for map (for main artist if person, or selected person)
   const bioTargetId = selectedPerson?.id || (artist.type === 'person' ? artist.id : undefined);
   const { data: artistBio } = useArtistBio(bioTargetId, !!bioTargetId);
+
+  // Fetch all member bios for band map (when no person is selected and main artist is a band)
+  const shouldFetchMemberBios = artist.type === 'group' && !selectedPerson && memberPersonIds.length > 0;
+  const { bios: memberBios, isLoading: isMemberBiosLoading } = useMultipleArtistBios(
+    memberPersonIds,
+    shouldFetchMemberBios
+  );
 
   // Normalize album name for matching - strip special chars and extra whitespace
   const normalizeForMatch = useCallback((name: string): string => {
@@ -357,12 +372,26 @@ export function SidebarSections({
     });
   }
 
-  // Add map section (for selected person or main artist if person, with bio data)
+  // Add map section
+  // - For a person (main or selected): show their single bio map
+  // - For a band with no person selected: show aggregated member locations
   if (bioTarget && artistBio) {
+    // Single person map
     allSections.push({
       id: 'map',
       title: selectedPerson ? `${selectedPerson.name} - Geography` : 'Geography',
       content: <ArtistMap bio={artistBio} />,
+    });
+  } else if (artist.type === 'group' && !selectedPerson && memberBios.length > 0) {
+    // Band map showing all member locations
+    allSections.push({
+      id: 'map',
+      title: 'Member Origins',
+      content: isMemberBiosLoading ? (
+        <div className="text-xs text-gray-400 py-2">Loading member locations...</div>
+      ) : (
+        <ArtistMap bios={memberBios} />
+      ),
     });
   }
 

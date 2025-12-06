@@ -32,11 +32,14 @@ export interface MapLocation {
   type: MapLocationType;
   place: WikidataPlace;
   label: string;
+  artistName?: string;  // For multi-artist maps
 }
 
 interface ArtistMapProps {
-  bio: WikidataArtistBio;
+  bio?: WikidataArtistBio;         // Single artist bio
+  bios?: WikidataArtistBio[];      // Multiple artist bios (for band view)
   className?: string;
+  showTravelPath?: boolean;        // Whether to show travel path (default: true for single, false for multi)
 }
 
 // Marker colors by type
@@ -50,8 +53,6 @@ const MARKER_COLORS: Record<MapLocationType, string> = {
  * Create a colored marker icon for Leaflet
  */
 function createMarkerIcon(color: string) {
-  // We need to dynamically create an icon since Leaflet requires it
-  // This returns a div icon with colored styling
   if (typeof window === 'undefined') return null;
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -76,16 +77,18 @@ function createMarkerIcon(color: string) {
 }
 
 /**
- * Extract all map locations from artist bio
+ * Extract all map locations from a single artist bio
  */
-function extractLocations(bio: WikidataArtistBio): MapLocation[] {
+function extractLocationsFromBio(bio: WikidataArtistBio, includeArtistName: boolean = false): MapLocation[] {
   const locations: MapLocation[] = [];
+  const artistName = includeArtistName ? bio.name : undefined;
 
   if (bio.birthPlace?.coordinates) {
     locations.push({
       type: 'birth',
       place: bio.birthPlace,
       label: `Born: ${bio.birthPlace.name}${bio.birthDate ? ` (${bio.birthDate.split('-')[0]})` : ''}`,
+      artistName,
     });
   }
 
@@ -96,6 +99,7 @@ function extractLocations(bio: WikidataArtistBio): MapLocation[] {
         type: 'residence',
         place: residence,
         label: `Lived in: ${residence.name}`,
+        artistName,
       });
     }
   });
@@ -105,7 +109,21 @@ function extractLocations(bio: WikidataArtistBio): MapLocation[] {
       type: 'death',
       place: bio.deathPlace,
       label: `Died: ${bio.deathPlace.name}${bio.deathDate ? ` (${bio.deathDate.split('-')[0]})` : ''}`,
+      artistName,
     });
+  }
+
+  return locations;
+}
+
+/**
+ * Extract locations from multiple artist bios
+ */
+function extractLocationsFromBios(bios: WikidataArtistBio[]): MapLocation[] {
+  const locations: MapLocation[] = [];
+
+  for (const bio of bios) {
+    locations.push(...extractLocationsFromBio(bio, true));
   }
 
   return locations;
@@ -141,7 +159,7 @@ function calculateBounds(locations: MapLocation[]): [[number, number], [number, 
   ];
 }
 
-function MapLegend() {
+function MapLegend({ isMultiArtist }: { isMultiArtist: boolean }) {
   return (
     <div className="absolute bottom-2 left-2 z-[1000] bg-white/90 rounded px-2 py-1.5 text-xs shadow-sm">
       <div className="flex items-center gap-3">
@@ -158,19 +176,25 @@ function MapLegend() {
           <span>Death</span>
         </div>
       </div>
+      {isMultiArtist && (
+        <div className="text-gray-500 mt-1 text-center">
+          All band members
+        </div>
+      )}
     </div>
   );
 }
 
-function MapContent({ locations }: { locations: MapLocation[] }) {
+function MapContent({ locations, showTravelPath }: { locations: MapLocation[]; showTravelPath: boolean }) {
   const bounds = useMemo(() => calculateBounds(locations), [locations]);
 
-  // Create polyline path through locations in order
+  // Create polyline path through locations in order (only for single artist)
   const pathCoordinates = useMemo(() => {
+    if (!showTravelPath) return [];
     return locations
       .filter((loc) => loc.place.coordinates)
       .map((loc) => [loc.place.coordinates!.latitude, loc.place.coordinates!.longitude] as [number, number]);
-  }, [locations]);
+  }, [locations, showTravelPath]);
 
   // Create marker icons for each type
   const icons = useMemo(() => {
@@ -203,7 +227,7 @@ function MapContent({ locations }: { locations: MapLocation[] }) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Draw travel path */}
+      {/* Draw travel path (single artist only) */}
       {pathCoordinates.length > 1 && (
         <Polyline
           positions={pathCoordinates}
@@ -221,11 +245,14 @@ function MapContent({ locations }: { locations: MapLocation[] }) {
 
         return (
           <Marker
-            key={`${location.type}-${index}`}
+            key={`${location.artistName || 'artist'}-${location.type}-${index}`}
             position={[location.place.coordinates.latitude, location.place.coordinates.longitude]}
             icon={icon}
           >
             <Popup>
+              {location.artistName && (
+                <div className="text-sm font-bold text-blue-600">{location.artistName}</div>
+              )}
               <div className="text-sm font-medium">{location.label}</div>
               {location.place.country && (
                 <div className="text-xs text-gray-500">{location.place.country}</div>
@@ -238,8 +265,23 @@ function MapContent({ locations }: { locations: MapLocation[] }) {
   );
 }
 
-export function ArtistMap({ bio, className = '' }: ArtistMapProps) {
-  const locations = useMemo(() => extractLocations(bio), [bio]);
+export function ArtistMap({ bio, bios, className = '', showTravelPath }: ArtistMapProps) {
+  // Determine if this is multi-artist mode
+  const isMultiArtist = !!bios && bios.length > 0;
+
+  // Extract locations from bio(s)
+  const locations = useMemo(() => {
+    if (bios && bios.length > 0) {
+      return extractLocationsFromBios(bios);
+    }
+    if (bio) {
+      return extractLocationsFromBio(bio, false);
+    }
+    return [];
+  }, [bio, bios]);
+
+  // Default showTravelPath: true for single artist, false for multi
+  const shouldShowPath = showTravelPath ?? !isMultiArtist;
 
   // Don't render if no locations with coordinates
   if (locations.length === 0) {
@@ -258,8 +300,8 @@ export function ArtistMap({ bio, className = '' }: ArtistMapProps) {
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossOrigin=""
       />
-      <MapContent locations={locations} />
-      <MapLegend />
+      <MapContent locations={locations} showTravelPath={shouldShowPath} />
+      <MapLegend isMultiArtist={isMultiArtist} />
     </div>
   );
 }
