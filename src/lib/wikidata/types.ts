@@ -30,6 +30,9 @@ export interface WikidataArtistBio {
   deathDate?: string;
   deathPlace?: WikidataPlace;
 
+  // Residences (places the artist lived)
+  residences?: WikidataPlace[];
+
   // Family
   spouses?: WikidataPerson[];
   children?: WikidataPerson[];
@@ -63,6 +66,7 @@ export const WIKIDATA_PROPERTIES = {
   // Location data
   COORDINATES: 'P625',
   COUNTRY: 'P17',
+  RESIDENCE: 'P551',        // Places of residence
 
   // External IDs
   MUSICBRAINZ_ARTIST_ID: 'P434',

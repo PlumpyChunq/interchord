@@ -4,6 +4,7 @@ const STORAGE_KEY = 'interchord-sidebar-prefs';
 
 export type SectionId =
   | 'biography'
+  | 'map'
   | 'member_of'
   | 'founder_of'
   | 'collaboration'
@@ -22,6 +23,7 @@ export interface SidebarPreferences {
 
 const DEFAULT_ORDER: SectionId[] = [
   'biography',
+  'map',
   'member_of',
   'founder_of',
   'collaboration',

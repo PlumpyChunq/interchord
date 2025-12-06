@@ -90,12 +90,16 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [ ] Discovery results panel
 - [ ] "Explore connections" mode
 
-#### Artist Biography & Geography (NEW)
-- [ ] Display birthplace, death place, country of origin from MusicBrainz
-- [ ] Interactive map widget in artist detail sidebar (right panel)
-- [ ] Plot birth/death locations on small graphical map
-- [ ] Show life-span dates (birth-death)
-- [ ] Consider Wikidata integration for richer biographical data (spouses, children, etc.)
+#### Artist Biography & Geography
+- [x] Wikidata integration for richer biographical data (spouses, children, etc.)
+- [x] Display birth/death dates and locations with age calculation
+- [x] Show family info (spouses, children count)
+- [x] Wikipedia and official website links
+- [x] Interactive map widget with Leaflet/OpenStreetMap (no API key needed)
+- [x] Plot birth, death, and residence locations on map
+- [x] Travel path polyline connecting locations chronologically
+- [x] Color-coded markers (green=birth, red=death, blue=residence)
+- [x] Collapsible sidebar section with drag-and-drop reordering
 
 #### User Concert Memories (NEW)
 - [ ] Upload concert tickets (photos/scans)
@@ -123,6 +127,14 @@ Leverage ALL MusicBrainz relationship types for richer discovery:
 - [x] Fallback image APIs with proxy routes
 - [ ] Member tenure visualization
 - [ ] Event filtering (albums only, members only)
+- [ ] Festival appearances (Lollapalooza, Lilith Fair, etc.)
+
+#### Media Integration (NEW)
+- [ ] Music videos from YouTube
+- [ ] Live performance videos
+- [ ] Behind-the-scenes footage
+- [ ] Audio samples/previews
+- [ ] Festival performance recordings
 
 ---
 

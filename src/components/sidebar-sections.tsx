@@ -5,6 +5,8 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { useSidebarPreferences, type SectionId } from '@/lib/sidebar';
 import { RecentConcerts } from '@/components/recent-concerts';
 import { ArtistBiography } from '@/components/artist-biography';
+import { ArtistMap } from '@/components/artist-map';
+import { useArtistBio } from '@/lib/wikidata';
 import { useStreamingPreference } from '@/lib/streaming';
 import { StreamingSelector } from '@/components/streaming-selector';
 import type { ArtistNode, ArtistRelationship, TimelineEvent } from '@/types';
@@ -64,6 +66,12 @@ export function SidebarSections({
   const sidebarPrefs = useSidebarPreferences();
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const { serviceInfo: streamingService } = useStreamingPreference();
+
+  // Fetch artist bio for map (only for person artists)
+  const { data: artistBio } = useArtistBio(
+    artist.type === 'person' ? artist.id : undefined,
+    artist.type === 'person'
+  );
 
   // Normalize album name for matching - strip special chars and extra whitespace
   const normalizeForMatch = useCallback((name: string): string => {
@@ -336,6 +344,15 @@ export function SidebarSections({
       id: 'biography',
       title: 'Biography',
       content: <ArtistBiography mbid={artist.id} artistName={artist.name} />,
+    });
+  }
+
+  // Add map section (only for person artists with bio data)
+  if (artist.type === 'person' && artistBio) {
+    allSections.push({
+      id: 'map',
+      title: 'Geography',
+      content: <ArtistMap bio={artistBio} />,
     });
   }
 

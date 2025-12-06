@@ -244,10 +244,12 @@ export async function getArtistBio(wikidataId: string): Promise<WikidataArtistBi
   // Fetch places in parallel
   const birthPlaceQid = getEntityReference(entity, P.PLACE_OF_BIRTH);
   const deathPlaceQid = getEntityReference(entity, P.PLACE_OF_DEATH);
+  const residenceQids = getAllEntityReferences(entity, P.RESIDENCE).slice(0, 10);
 
-  const [birthPlace, deathPlace] = await Promise.all([
+  const [birthPlace, deathPlace, ...residences] = await Promise.all([
     birthPlaceQid ? fetchPlace(birthPlaceQid) : null,
     deathPlaceQid ? fetchPlace(deathPlaceQid) : null,
+    ...residenceQids.map(fetchPlace),
   ]);
 
   // Fetch family members (limit to first 5 each to avoid too many requests)
@@ -267,6 +269,7 @@ export async function getArtistBio(wikidataId: string): Promise<WikidataArtistBi
     birthPlace: birthPlace || undefined,
     deathDate: getClaimValue(entity, P.DATE_OF_DEATH),
     deathPlace: deathPlace || undefined,
+    residences: residences.filter((r): r is WikidataPlace => r !== null),
     spouses: spouses.filter((s): s is WikidataPerson => s !== null),
     children: children.filter((c): c is WikidataPerson => c !== null),
     wikipediaUrl: getWikipediaUrl(entity),
