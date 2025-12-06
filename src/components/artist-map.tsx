@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import type { WikidataArtistBio, WikidataPlace } from '@/lib/wikidata';
 
 // Dynamically import the map component to avoid SSR issues
@@ -23,6 +23,24 @@ const Popup = dynamic(
 );
 const Polyline = dynamic(
   () => import('react-leaflet').then((mod) => mod.Polyline),
+  { ssr: false }
+);
+
+// Component to fit map bounds after mount
+const FitBounds = dynamic(
+  () => import('react-leaflet').then((mod) => {
+    const { useMap } = mod;
+    // Create a component that fits bounds
+    return function FitBoundsComponent({ bounds }: { bounds: [[number, number], [number, number]] }) {
+      const map = useMap();
+      useEffect(() => {
+        if (bounds) {
+          map.fitBounds(bounds, { padding: [20, 20] });
+        }
+      }, [map, bounds]);
+      return null;
+    };
+  }),
   { ssr: false }
 );
 
@@ -217,11 +235,13 @@ function MapContent({ locations, showTravelPath }: { locations: MapLocation[]; s
   return (
     <MapContainer
       center={center}
-      zoom={4}
-      bounds={bounds}
+      zoom={2}
       style={{ height: '100%', width: '100%' }}
       scrollWheelZoom={false}
     >
+      {/* Fit bounds after map mounts */}
+      <FitBounds bounds={bounds} />
+
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -293,6 +313,29 @@ export function ArtistMap({ bio, bios, className = '', showTravelPath }: ArtistM
     return `map-${locationIds}`;
   }, [locations]);
 
+  // Handle double-click to open map in new window
+  const handleDoubleClick = useCallback(() => {
+    const bounds = calculateBounds(locations);
+    if (!bounds) return;
+
+    // Calculate center and zoom level for OpenStreetMap
+    const centerLat = (bounds[0][0] + bounds[1][0]) / 2;
+    const centerLng = (bounds[0][1] + bounds[1][1]) / 2;
+
+    // Calculate zoom based on bounds span (rough estimate)
+    const latSpan = bounds[1][0] - bounds[0][0];
+    const lngSpan = bounds[1][1] - bounds[0][1];
+    const maxSpan = Math.max(latSpan, lngSpan);
+    // Rough zoom calculation: smaller span = higher zoom
+    const zoom = Math.max(2, Math.min(12, Math.floor(8 - Math.log2(maxSpan))));
+
+    // Build OpenStreetMap URL with markers
+    // For multiple locations, we'll use the bounding box view
+    const osmUrl = `https://www.openstreetmap.org/?mlat=${centerLat}&mlon=${centerLng}#map=${zoom}/${centerLat.toFixed(4)}/${centerLng.toFixed(4)}`;
+
+    window.open(osmUrl, '_blank', 'noopener,noreferrer');
+  }, [locations]);
+
   // Don't render if no locations with coordinates
   if (locations.length === 0) {
     return (
@@ -303,7 +346,13 @@ export function ArtistMap({ bio, bios, className = '', showTravelPath }: ArtistM
   }
 
   return (
-    <div className={`relative ${className}`} style={{ height: '200px' }} key={mapKey}>
+    <div
+      className={`relative ${className} cursor-pointer`}
+      style={{ height: '200px' }}
+      key={mapKey}
+      onDoubleClick={handleDoubleClick}
+      title="Double-click to open in OpenStreetMap"
+    >
       <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -312,6 +361,10 @@ export function ArtistMap({ bio, bios, className = '', showTravelPath }: ArtistM
       />
       <MapContent locations={locations} showTravelPath={shouldShowPath} />
       <MapLegend isMultiArtist={isMultiArtist} />
+      {/* Hint for double-click */}
+      <div className="absolute top-1 right-1 z-[1000] bg-white/80 rounded px-1.5 py-0.5 text-[10px] text-gray-500 pointer-events-none">
+        Double-click to expand
+      </div>
     </div>
   );
 }
