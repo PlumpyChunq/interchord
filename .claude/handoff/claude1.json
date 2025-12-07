@@ -1,72 +1,80 @@
 {
   "from": "claude1",
   "location": "Mac (development)",
-  "timestamp": "2025-12-07T17:25:00Z",
-  "sequence": 40,
-  "status": "REQUEST",
-  "current_task": "Configure MusicBrainz live replication with systemd timer",
+  "timestamp": "2025-12-07T17:35:00Z",
+  "sequence": 41,
+  "status": "REQUEST_UPDATE",
+  "current_task": "Configure MusicBrainz replication + weekly Solr index refresh",
   "priority": "HIGH",
-  "in_response_to": {
-    "from_claude2_sequence": 39,
-    "acknowledged": "Solr recording index restore ready - good to know Solr 9.7.0 is compatible with new backups"
-  },
-  "message": "User wants to enable live replication for the MusicBrainz database mirror so it stays in sync with upstream. Use systemd timers (NOT cron) for scheduling. MusicBrainz offers hourly replication packets. Also: go ahead with the Solr recording index restore (46GB) when you have time.",
+  "message": "Adding to previous request: Also set up weekly Solr index refresh. Search indexes are NOT included in replication - they need separate maintenance. Use systemd timer for weekly refresh (not cron).",
   "needs_response": true,
   "requested_tasks": [
     {
       "task": "Check current database freshness",
-      "description": "Query the database to see when it was last updated. Check replication_control table or similar.",
+      "description": "Query the database to see when it was last updated.",
       "commands": [
         "podman exec musicbrainz-docker_db_1 psql -U musicbrainz musicbrainz_db -c \"SELECT * FROM replication_control;\""
       ]
     },
     {
-      "task": "Check if replication is already configured in docker-compose",
-      "description": "Look at ~/musicbrainz-docker/docker-compose.yml for REPLICATION_TYPE environment variable",
-      "look_for": "REPLICATION_TYPE should be set to enable live replication"
-    },
-    {
-      "task": "Enable replication in musicbrainz-docker",
-      "description": "The musicbrainz-docker project supports replication. May need to set environment variables or run a replication script.",
+      "task": "Enable hourly database replication",
+      "description": "Configure replication in musicbrainz-docker per their docs",
       "documentation": "https://github.com/metabrainz/musicbrainz-docker"
     },
     {
-      "task": "Create systemd service for replication",
+      "task": "Create systemd service for DB replication",
       "file": "~/.config/systemd/user/musicbrainz-replication.service",
-      "content_example": "[Unit]\nDescription=MusicBrainz Replication\nAfter=musicbrainz.service\nRequires=musicbrainz.service\n\n[Service]\nType=oneshot\nWorkingDirectory=%h/musicbrainz-docker\nExecStart=/usr/bin/podman-compose exec musicbrainz /usr/local/bin/replication.sh\n\n[Install]\nWantedBy=default.target"
+      "content": "[Unit]\nDescription=MusicBrainz Database Replication\nAfter=musicbrainz.service\nRequires=musicbrainz.service\n\n[Service]\nType=oneshot\nWorkingDirectory=%h/musicbrainz-docker\nExecStart=/usr/bin/podman-compose exec musicbrainz replication.sh\n\n[Install]\nWantedBy=default.target"
     },
     {
-      "task": "Create systemd timer for hourly replication",
+      "task": "Create systemd timer for hourly DB replication",
       "file": "~/.config/systemd/user/musicbrainz-replication.timer",
-      "content_example": "[Unit]\nDescription=Run MusicBrainz replication hourly\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target"
+      "content": "[Unit]\nDescription=Run MusicBrainz replication hourly\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\nRandomizedDelaySec=300\n\n[Install]\nWantedBy=timers.target"
     },
     {
-      "task": "Enable and start the timer",
+      "task": "Create systemd service for Solr index refresh",
+      "file": "~/.config/systemd/user/musicbrainz-solr-refresh.service",
+      "content": "[Unit]\nDescription=MusicBrainz Solr Index Refresh\nAfter=musicbrainz.service\nRequires=musicbrainz.service\n\n[Service]\nType=oneshot\nWorkingDirectory=%h/musicbrainz-docker\n# Adjust command based on how musicbrainz-docker handles index updates\nExecStart=/usr/bin/podman-compose exec indexer /home/musicbrainz/musicbrainz-server/admin/BuildSitemaps.pl --ping\n# Or download fresh indexes from data.metabrainz.org\n\n[Install]\nWantedBy=default.target"
+    },
+    {
+      "task": "Create systemd timer for weekly Solr refresh",
+      "file": "~/.config/systemd/user/musicbrainz-solr-refresh.timer",
+      "content": "[Unit]\nDescription=Refresh MusicBrainz Solr indexes weekly\n\n[Timer]\nOnCalendar=Sun 04:00:00\nPersistent=true\nRandomizedDelaySec=1800\n\n[Install]\nWantedBy=timers.target",
+      "notes": "Runs Sunday 4 AM with up to 30 min random delay to avoid thundering herd"
+    },
+    {
+      "task": "Enable and start all timers",
       "commands": [
         "systemctl --user daemon-reload",
-        "systemctl --user enable musicbrainz-replication.timer",
-        "systemctl --user start musicbrainz-replication.timer",
-        "systemctl --user list-timers"
+        "systemctl --user enable musicbrainz-replication.timer musicbrainz-solr-refresh.timer",
+        "systemctl --user start musicbrainz-replication.timer musicbrainz-solr-refresh.timer",
+        "systemctl --user list-timers --all"
       ]
     },
     {
       "task": "Test replication manually first",
-      "description": "Run one replication cycle manually to verify it works before enabling the timer"
+      "description": "Run one replication cycle manually to verify it works"
     },
     {
-      "task": "Restore Solr recording index (when convenient)",
+      "task": "Restore Solr recording index (immediate)",
       "description": "Download and restore the 46GB recording.tar.zst from data.metabrainz.org",
-      "priority": "can do after replication is set up"
+      "url": "https://data.metabrainz.org/pub/musicbrainz/data/solr-backups/20251206-041002/recording.tar.zst",
+      "priority": "Do this first to fix broken search"
     }
   ],
+  "best_practices_applied": {
+    "db_replication": "Hourly - matches MusicBrainz packet release frequency, keeps data <1 hour stale",
+    "solr_refresh": "Weekly - indexes don't change as frequently, reduces bandwidth",
+    "randomized_delay": "Prevents all mirrors hitting servers at exact same time",
+    "persistent": "Catches up on missed runs if server was down"
+  },
   "context": {
     "musicbrainz_location": "~/musicbrainz-docker",
     "current_services": [
       "musicbrainz.service (enabled, running)",
       "interchord.service (enabled, running)"
     ],
-    "linger_enabled": true,
-    "goal": "Keep MusicBrainz data fresh with hourly updates from upstream"
+    "linger_enabled": true
   },
-  "notes": "The musicbrainz-docker project has built-in replication support. Check their documentation for the exact commands. The replication packets are small (hourly deltas) so this shouldn't use much bandwidth. User specifically requested systemd timers instead of cron."
+  "notes": "User specifically requested systemd timers instead of cron. The Solr service file is a template - check musicbrainz-docker docs for exact index rebuild command. May need to download fresh backups from data.metabrainz.org instead of rebuilding locally."
 }
