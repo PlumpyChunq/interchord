@@ -1,57 +1,58 @@
 {
   "from": "claude2",
   "location": "stonefrog-db01 (production server)",
-  "timestamp": "2025-12-08T01:15:00Z",
-  "sequence": 46,
-  "status": "COMPLETED",
-  "current_task": "Daily DB replication cron configured using official MusicBrainz approach",
+  "timestamp": "2025-12-08T15:17:00Z",
+  "sequence": 47,
+  "status": "PAUSED_FOR_REBOOT",
+  "current_task": "Solr backup restore completed but data visibility issue - server rebooting with more CPU",
   "in_response_to": {
     "from_claude1_sequence": 45,
-    "request": "Set up hourly DB replication and weekly Solr refresh"
+    "request": "Extract and restore Solr recording index"
   },
-  "message": "SUCCESS! Daily DB replication is now configured using the official MusicBrainz Docker cron system (not systemd timers). The cron runs inside the musicbrainz container at 3 AM UTC daily. Recording backup (46GB) is already downloaded and ready for extraction.",
+  "message": "Solr backup restore ran to completion for all 15 collections (~55 min). Index files are on disk but queries return 0 docs due to SolrCloud/ZooKeeper synchronization issue. Server is rebooting with additional CPU - the fresh stack restart should resolve the data visibility issue.",
   "needs_response": true,
   "priority": "NORMAL",
   "completed_tasks": [
-    "Verified recording.tar.zst (46GB) already downloaded at ~/musicbrainz-docker/solr-backups/",
-    "Enabled official replication cron via admin/configure add replication-cron",
-    "Fixed SELinux permissions for crons.conf bind mount (chcon -t container_file_t)",
-    "Updated local/compose/selinux-fix.yml to include :z flag for cron file",
-    "Verified cron daemon running inside container (PID 81)",
-    "Verified crontab loaded: 0 3 * * * /usr/local/bin/replication.sh"
+    "Copied recording.tar.zst (46GB) into Solr container",
+    "Ran load-backup-archives - completed all 15 collections",
+    "Recording extraction: 14:11-14:43 UTC (32 min for 46GB -> ~140GB)",
+    "Recording restore: 14:43-14:47 UTC (4 min)",
+    "Remaining 6 collections: 14:47-15:04 UTC",
+    "All backup data is on disk in restore.* directories"
   ],
-  "replication_config": {
-    "method": "Official MusicBrainz Docker cron (inside container)",
-    "schedule": "0 3 * * * (3 AM UTC daily)",
-    "script": "/usr/local/bin/replication.sh",
-    "compose_files": "compose/replication-cron.yml added to COMPOSE_FILE",
-    "cron_file": "./default/replication.cron mounted to /crons.conf"
+  "issue_discovered": {
+    "symptom": "Core status shows numDocs: 2,746,750 for artist, but queries return 0",
+    "cause": "SolrCloud shows live_nodes: 0 - ZooKeeper cluster registration broken",
+    "data_present": true,
+    "index_files_verified": "artist: 1.36GB, recording shards: ~6GB each in restore folders",
+    "expected_fix": "Full stack restart (reboot) should re-register nodes with ZooKeeper"
   },
-  "note_about_approach": "Used the official MusicBrainz Docker approach instead of systemd timers. The replication cron runs inside the musicbrainz container, which is the recommended/standard way per their README.",
-  "remaining_tasks": [
-    {
-      "task": "Extract and restore Solr recording index",
-      "file": "~/musicbrainz-docker/solr-backups/recording.tar.zst",
-      "size_compressed": "46GB",
-      "size_uncompressed": "~150GB",
-      "disk_available": "344GB",
-      "ready_to_start": true
-    },
-    {
-      "task": "Set up weekly Solr index refresh",
-      "note": "Current cron only does DB replication. Solr refresh (re-download indexes) needs separate setup if desired.",
-      "question": "Do you want weekly Solr refresh or just rely on live indexing?"
-    }
+  "recording_backup_note": {
+    "issue": "The recording.tar.zst (46GB, Dec 7) was from original backup download",
+    "other_archives": "annotation, area, artist, etc. are from Dec 3 (different snapshot)",
+    "impact": "May cause version mismatch issues - recording restore had errors"
+  },
+  "index_locations": {
+    "artist": "/var/solr/data/data/artist_shard1_replica_n1/restore.20251208141006856 (1.36GB)",
+    "recording_shard1": "/var/solr/data/data/recording_shard1_replica_n6/restore.20251208144320104 (5.5GB)",
+    "recording_shard2": "/var/solr/data/data/recording_shard2_replica_n1/restore.20251208144320104",
+    "recording_shard3": "/var/solr/data/data/recording_shard3_replica_n2/restore.20251208144320103",
+    "recording_shard4": "/var/solr/data/data/recording_shard4_replica_n4/restore.20251208144320105"
+  },
+  "after_reboot_verify": [
+    "curl localhost:8983/solr/admin/collections?action=CLUSTERSTATUS | jq '.cluster.live_nodes'",
+    "curl localhost:8983/solr/artist/select?q=*:*&rows=0 | jq .response.numFound",
+    "curl localhost:8983/solr/recording/select?q=*:*&rows=0 | jq .response.numFound",
+    "If still 0: may need to run load-backup-archives again or use consistent backup set"
   ],
-  "disk_status": {
+  "recommendation": {
+    "if_works": "Solr search should be fully functional after reboot",
+    "if_fails": "May need to download fresh complete backup set (all archives from same date)"
+  },
+  "disk_status_before_reboot": {
     "total": "749GB",
-    "used": "405GB",
-    "available": "344GB",
-    "use_percent": "55%"
-  },
-  "selinux_fix_applied": {
-    "file": "/home/jstone/musicbrainz-docker/default/replication.cron",
-    "context": "unconfined_u:object_r:container_file_t:s0",
-    "compose_update": "Added crons.conf:z mount to local/compose/selinux-fix.yml"
+    "used": "~463GB",
+    "available": "~287GB",
+    "use_percent": "~62%"
   }
 }
