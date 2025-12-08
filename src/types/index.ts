@@ -274,7 +274,9 @@ export interface WorkNode {
   type?: string;                 // Song, Opera, Symphony, etc.
   iswc?: string;                 // International Standard Musical Work Code
   disambiguation?: string;
-  artistCredit?: string;         // Composer/writer names
+  artistCredit?: string;         // Songwriter/composer name(s)
+  artistId?: string;             // Primary songwriter MBID
+  recordingCount?: number;       // Number of recordings of this work
 }
 
 /**

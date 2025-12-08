@@ -89,9 +89,16 @@ function EntityDetail({
         return (
           <>
             {work.artistCredit && (
-              <p className="text-lg text-gray-600">by {work.artistCredit}</p>
+              <p className="text-lg text-gray-600">
+                <span className="font-medium">Written by:</span> {work.artistCredit}
+              </p>
             )}
             {work.type && <p className="text-gray-500">Type: {work.type}</p>}
+            {work.recordingCount && work.recordingCount > 0 && (
+              <p className="text-gray-500">
+                {work.recordingCount} recording{work.recordingCount !== 1 ? 's' : ''} of this composition
+              </p>
+            )}
             {work.iswc && <p className="text-gray-400 text-sm">ISWC: {work.iswc}</p>}
           </>
         );
@@ -135,7 +142,7 @@ function EntityDetail({
   const typeLabels: Record<string, string> = {
     recording: 'Song',
     release: 'Album',
-    work: 'Composition',
+    work: 'Song Composition',
     label: 'Record Label',
     place: 'Place',
     event: 'Event',

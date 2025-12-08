@@ -91,7 +91,9 @@ interface SolrWorkDoc {
   type?: string;               // Song, Opera, etc.
   iswc?: string;
   comment?: string;
-  artist?: string;             // Composer names
+  artist?: string;             // Composer/songwriter names
+  arid?: string;               // Composer MBID
+  recording_count?: number;    // Number of recordings of this work
 }
 
 interface SolrLabelDoc {
@@ -232,7 +234,9 @@ function mapSolrWorkDoc(doc: SolrWorkDoc): WorkNode {
     type: doc.type,
     iswc: doc.iswc,
     disambiguation: doc.comment,
-    artistCredit: doc.artist,
+    artistCredit: doc.artist,        // Songwriter/composer name
+    artistId: doc.arid,              // Songwriter MBID
+    recordingCount: doc.recording_count,
   };
 }
 
@@ -353,7 +357,7 @@ function getReturnFields(entityType: SearchEntityType): string {
     case 'release-group':
       return 'mbid,releasegroup,artist,arid,type,firstreleasedate,comment';
     case 'work':
-      return 'mbid,work,type,iswc,comment,artist';
+      return 'mbid,work,type,iswc,comment,artist,arid,recording_count';
     case 'label':
       return 'mbid,label,type,country,begin,comment';
     case 'place':

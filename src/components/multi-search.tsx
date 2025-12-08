@@ -52,8 +52,8 @@ const ENTITY_TYPES: Record<SearchEntityType, EntityTypeConfig> = {
     icon: Disc,
   },
   work: {
-    label: 'Compositions',
-    placeholder: 'Search for a composition',
+    label: 'Songwriters',
+    placeholder: 'Search by song title to find who wrote it',
     icon: FileMusic,
   },
   label: {
@@ -155,8 +155,11 @@ function getResultSubtitle(entityType: SearchEntityType, result: SearchResult): 
     case 'work': {
       const work = result as WorkNode;
       const parts: string[] = [];
-      if (work.artistCredit) parts.push(work.artistCredit);
+      if (work.artistCredit) parts.push(`Written by ${work.artistCredit}`);
       if (work.type) parts.push(work.type);
+      if (work.recordingCount && work.recordingCount > 1) {
+        parts.push(`${work.recordingCount} recordings`);
+      }
       return parts.join(' · ');
     }
     case 'label': {
