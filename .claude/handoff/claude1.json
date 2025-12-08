@@ -1,69 +1,40 @@
 {
   "from": "claude1",
   "location": "Mac (development)",
-  "timestamp": "2025-12-07T17:55:00Z",
-  "sequence": 44,
-  "status": "ACTION_REQUIRED",
-  "current_task": "Expand filesystem to use new 750GB disk",
+  "timestamp": "2025-12-07T18:10:00Z",
+  "sequence": 45,
+  "status": "READY",
+  "current_task": "Disk expanded - proceed with Solr restore and replication",
   "priority": "HIGH",
-  "message": "Good news! User expanded the VM disk to 750GB in Proxmox. Now you need to resize the partition/filesystem inside the VM to use the new space. After that, you can retry the Solr recording index extraction.",
+  "message": "SUCCESS! Disk has been expanded to 749GB with 344GB free. You can now proceed with: 1) Re-download recording.tar.zst, 2) Extract Solr recording index, 3) Set up hourly replication with systemd timer, 4) Set up weekly Solr refresh.",
   "needs_response": true,
-  "disk_info": {
-    "proxmox_size": "750GB",
-    "device": "sata0 (likely /dev/sda)",
-    "storage_backend": "local-vmdata-raidz1"
+  "disk_status": {
+    "total": "749GB",
+    "used": "405GB",
+    "available": "344GB",
+    "use_percent": "55%"
   },
-  "steps_to_expand_filesystem": [
+  "tasks_to_complete": [
     {
-      "step": 1,
-      "task": "Check current disk layout",
-      "commands": [
-        "lsblk",
-        "df -h",
-        "sudo fdisk -l"
-      ]
+      "task": "Download Solr recording backup",
+      "url": "https://data.metabrainz.org/pub/musicbrainz/data/solr-backups/20251206-041002/recording.tar.zst",
+      "size": "46GB compressed"
     },
     {
-      "step": 2,
-      "task": "Grow the partition (if using LVM)",
-      "commands": [
-        "# If LVM (common on Ubuntu):",
-        "sudo pvresize /dev/sda3",
-        "sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv",
-        "sudo resize2fs /dev/ubuntu-vg/ubuntu-lv"
-      ],
-      "alternative": {
-        "if_not_lvm": [
-          "# If not using LVM, use growpart:",
-          "sudo growpart /dev/sda 3",
-          "sudo resize2fs /dev/sda3"
-        ]
-      }
+      "task": "Extract and restore recording index",
+      "size": "~150GB uncompressed",
+      "space_after": "~194GB free remaining"
     },
     {
-      "step": 3,
-      "task": "Verify new space is available",
-      "command": "df -h",
-      "expected": "Root filesystem should now show ~750GB total"
+      "task": "Set up hourly DB replication",
+      "method": "systemd timer (not cron)",
+      "schedule": "hourly"
     },
     {
-      "step": 4,
-      "task": "Clean up any partial extraction artifacts",
-      "commands": [
-        "rm -rf ~/recording.tar.zst 2>/dev/null",
-        "podman exec musicbrainz-docker_search_1 rm -rf /var/solr/data/backups/recording 2>/dev/null"
-      ]
-    },
-    {
-      "step": 5,
-      "task": "Retry Solr recording index restore",
-      "description": "Now you have plenty of space for the 150GB uncompressed index"
+      "task": "Set up weekly Solr refresh",
+      "method": "systemd timer",
+      "schedule": "Sunday 4 AM"
     }
   ],
-  "after_filesystem_expansion": [
-    "Continue with hourly replication setup (systemd timers)",
-    "Continue with weekly Solr refresh setup",
-    "Restore the recording index"
-  ],
-  "notes": "The disk shows as 750G in Proxmox Hardware tab. VM may need the partition table rescanned - if lsblk still shows old size, try: sudo partprobe /dev/sda"
+  "notes": "User manually expanded disk in Proxmox and grew the XFS filesystem. Config was reset due to disk full corruption - you may need to re-authenticate and pull latest from git."
 }
