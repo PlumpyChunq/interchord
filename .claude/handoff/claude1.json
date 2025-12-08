@@ -1,80 +1,79 @@
 {
   "from": "claude1",
   "location": "Mac (development)",
-  "timestamp": "2025-12-07T17:35:00Z",
-  "sequence": 41,
-  "status": "REQUEST_UPDATE",
-  "current_task": "Configure MusicBrainz replication + weekly Solr index refresh",
+  "timestamp": "2025-12-07T17:45:00Z",
+  "sequence": 42,
+  "status": "ALERT",
+  "current_task": "Solr extraction crashed - disk full",
   "priority": "HIGH",
-  "message": "Adding to previous request: Also set up weekly Solr index refresh. Search indexes are NOT included in replication - they need separate maintenance. Use systemd timer for weekly refresh (not cron).",
+  "message": "Your Solr recording index extraction CRASHED with ENOSPC (no space left on device). The 46GB compressed archive decompresses to 100-150GB and filled the disk at 3.6GB extracted. You need to: 1) Clean up the partial extraction, 2) Free disk space or find alternate location, 3) Check available space before retrying.",
   "needs_response": true,
-  "requested_tasks": [
+  "error_details": {
+    "error": "ENOSPC: no space left on device, write",
+    "errno": -28,
+    "syscall": "write",
+    "location": "/var/solr/data/backups/recording/",
+    "extracted_before_crash": "3.6GB",
+    "expected_uncompressed_size": "100-150GB"
+  },
+  "recovery_steps": [
     {
-      "task": "Check current database freshness",
-      "description": "Query the database to see when it was last updated.",
+      "step": 1,
+      "task": "Clean up partial extraction",
       "commands": [
-        "podman exec musicbrainz-docker_db_1 psql -U musicbrainz musicbrainz_db -c \"SELECT * FROM replication_control;\""
+        "podman exec musicbrainz-docker_search_1 rm -rf /var/solr/data/backups/recording/*",
+        "# Or wherever the partial files are"
       ]
     },
     {
-      "task": "Enable hourly database replication",
-      "description": "Configure replication in musicbrainz-docker per their docs",
-      "documentation": "https://github.com/metabrainz/musicbrainz-docker"
-    },
-    {
-      "task": "Create systemd service for DB replication",
-      "file": "~/.config/systemd/user/musicbrainz-replication.service",
-      "content": "[Unit]\nDescription=MusicBrainz Database Replication\nAfter=musicbrainz.service\nRequires=musicbrainz.service\n\n[Service]\nType=oneshot\nWorkingDirectory=%h/musicbrainz-docker\nExecStart=/usr/bin/podman-compose exec musicbrainz replication.sh\n\n[Install]\nWantedBy=default.target"
-    },
-    {
-      "task": "Create systemd timer for hourly DB replication",
-      "file": "~/.config/systemd/user/musicbrainz-replication.timer",
-      "content": "[Unit]\nDescription=Run MusicBrainz replication hourly\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\nRandomizedDelaySec=300\n\n[Install]\nWantedBy=timers.target"
-    },
-    {
-      "task": "Create systemd service for Solr index refresh",
-      "file": "~/.config/systemd/user/musicbrainz-solr-refresh.service",
-      "content": "[Unit]\nDescription=MusicBrainz Solr Index Refresh\nAfter=musicbrainz.service\nRequires=musicbrainz.service\n\n[Service]\nType=oneshot\nWorkingDirectory=%h/musicbrainz-docker\n# Adjust command based on how musicbrainz-docker handles index updates\nExecStart=/usr/bin/podman-compose exec indexer /home/musicbrainz/musicbrainz-server/admin/BuildSitemaps.pl --ping\n# Or download fresh indexes from data.metabrainz.org\n\n[Install]\nWantedBy=default.target"
-    },
-    {
-      "task": "Create systemd timer for weekly Solr refresh",
-      "file": "~/.config/systemd/user/musicbrainz-solr-refresh.timer",
-      "content": "[Unit]\nDescription=Refresh MusicBrainz Solr indexes weekly\n\n[Timer]\nOnCalendar=Sun 04:00:00\nPersistent=true\nRandomizedDelaySec=1800\n\n[Install]\nWantedBy=timers.target",
-      "notes": "Runs Sunday 4 AM with up to 30 min random delay to avoid thundering herd"
-    },
-    {
-      "task": "Enable and start all timers",
+      "step": 2,
+      "task": "Check current disk usage",
       "commands": [
-        "systemctl --user daemon-reload",
-        "systemctl --user enable musicbrainz-replication.timer musicbrainz-solr-refresh.timer",
-        "systemctl --user start musicbrainz-replication.timer musicbrainz-solr-refresh.timer",
-        "systemctl --user list-timers --all"
+        "df -h",
+        "du -sh /var/lib/containers/*",
+        "podman system df"
       ]
     },
     {
-      "task": "Test replication manually first",
-      "description": "Run one replication cycle manually to verify it works"
+      "step": 3,
+      "task": "Free up space - options",
+      "options": [
+        "Remove old container images: podman image prune -a",
+        "Remove build cache: podman builder prune",
+        "Check for large log files in containers",
+        "Move Solr data to a different volume/disk with more space"
+      ]
     },
     {
-      "task": "Restore Solr recording index (immediate)",
-      "description": "Download and restore the 46GB recording.tar.zst from data.metabrainz.org",
-      "url": "https://data.metabrainz.org/pub/musicbrainz/data/solr-backups/20251206-041002/recording.tar.zst",
-      "priority": "Do this first to fix broken search"
+      "step": 4,
+      "task": "Verify enough space before retry",
+      "description": "Need at least 150GB free to safely extract the recording index",
+      "command": "df -h /var/solr/data"
+    },
+    {
+      "step": 5,
+      "task": "Consider streaming extraction",
+      "description": "Instead of extracting to disk, could stream directly: zstd -d recording.tar.zst | tar xv",
+      "note": "Still needs same disk space for final files"
     }
   ],
-  "best_practices_applied": {
-    "db_replication": "Hourly - matches MusicBrainz packet release frequency, keeps data <1 hour stale",
-    "solr_refresh": "Weekly - indexes don't change as frequently, reduces bandwidth",
-    "randomized_delay": "Prevents all mirrors hitting servers at exact same time",
-    "persistent": "Catches up on missed runs if server was down"
-  },
+  "alternative_approaches": [
+    {
+      "option": "Mount additional storage",
+      "description": "Add a new disk/volume for Solr data if current disk is too small"
+    },
+    {
+      "option": "Skip recording index for now",
+      "description": "Recording search is nice-to-have. Could proceed with replication setup first and address recording index later when storage is resolved"
+    },
+    {
+      "option": "Use smaller index",
+      "description": "Check if MusicBrainz offers a partial/smaller recording index"
+    }
+  ],
   "context": {
-    "musicbrainz_location": "~/musicbrainz-docker",
-    "current_services": [
-      "musicbrainz.service (enabled, running)",
-      "interchord.service (enabled, running)"
-    ],
-    "linger_enabled": true
+    "what_was_happening": "Extracting recording.tar.zst (46GB compressed) for Solr index restore",
+    "progress_when_crashed": "3.6GB extracted to /var/solr/data/backups/recording/"
   },
-  "notes": "User specifically requested systemd timers instead of cron. The Solr service file is a template - check musicbrainz-docker docs for exact index rebuild command. May need to download fresh backups from data.metabrainz.org instead of rebuilding locally."
+  "notes": "The disk space issue needs to be resolved before the recording index can be restored. May need to check Proxmox VM disk allocation or add additional storage."
 }
