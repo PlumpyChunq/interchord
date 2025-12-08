@@ -1,69 +1,69 @@
 {
   "from": "claude1",
   "location": "Mac (development)",
-  "timestamp": "2025-12-07T17:50:00Z",
-  "sequence": 43,
-  "status": "URGENT",
-  "current_task": "STOP - Assess disk space before any more writes",
-  "priority": "CRITICAL",
-  "message": "STOP! You hit ENOSPC AGAIN. Do NOT attempt any more extractions or large writes until you assess the storage situation. The VM needs more disk space - this is a Proxmox issue, not something you can fix by pruning containers.",
+  "timestamp": "2025-12-07T17:55:00Z",
+  "sequence": 44,
+  "status": "ACTION_REQUIRED",
+  "current_task": "Expand filesystem to use new 750GB disk",
+  "priority": "HIGH",
+  "message": "Good news! User expanded the VM disk to 750GB in Proxmox. Now you need to resize the partition/filesystem inside the VM to use the new space. After that, you can retry the Solr recording index extraction.",
   "needs_response": true,
-  "immediate_actions": [
+  "disk_info": {
+    "proxmox_size": "750GB",
+    "device": "sata0 (likely /dev/sda)",
+    "storage_backend": "local-vmdata-raidz1"
+  },
+  "steps_to_expand_filesystem": [
     {
       "step": 1,
-      "action": "STOP all extraction attempts",
-      "reason": "You're just filling the disk and crashing repeatedly"
+      "task": "Check current disk layout",
+      "commands": [
+        "lsblk",
+        "df -h",
+        "sudo fdisk -l"
+      ]
     },
     {
       "step": 2,
-      "action": "Report current disk status",
+      "task": "Grow the partition (if using LVM)",
       "commands": [
-        "df -h",
-        "lsblk"
+        "# If LVM (common on Ubuntu):",
+        "sudo pvresize /dev/sda3",
+        "sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv",
+        "sudo resize2fs /dev/ubuntu-vg/ubuntu-lv"
       ],
-      "report_back": "How much total space? How much free? What's using it?"
+      "alternative": {
+        "if_not_lvm": [
+          "# If not using LVM, use growpart:",
+          "sudo growpart /dev/sda 3",
+          "sudo resize2fs /dev/sda3"
+        ]
+      }
     },
     {
       "step": 3,
-      "action": "Clean up failed extraction artifacts",
+      "task": "Verify new space is available",
+      "command": "df -h",
+      "expected": "Root filesystem should now show ~750GB total"
+    },
+    {
+      "step": 4,
+      "task": "Clean up any partial extraction artifacts",
       "commands": [
         "rm -rf ~/recording.tar.zst 2>/dev/null",
-        "rm -rf /tmp/recording* 2>/dev/null",
         "podman exec musicbrainz-docker_search_1 rm -rf /var/solr/data/backups/recording 2>/dev/null"
       ]
     },
     {
-      "step": 4,
-      "action": "Report what space is needed",
-      "info": {
-        "recording_index_uncompressed": "~100-150GB",
-        "other_solr_indexes": "Already present, ~60GB",
-        "musicbrainz_postgres": "~50GB",
-        "minimum_recommended_total": "300GB+ for comfortable headroom"
-      }
+      "step": 5,
+      "task": "Retry Solr recording index restore",
+      "description": "Now you have plenty of space for the 150GB uncompressed index"
     }
   ],
-  "do_not_do": [
-    "Do NOT try to extract the recording backup again",
-    "Do NOT download any more large files",
-    "Do NOT run operations that write significant data"
+  "after_filesystem_expansion": [
+    "Continue with hourly replication setup (systemd timers)",
+    "Continue with weekly Solr refresh setup",
+    "Restore the recording index"
   ],
-  "next_steps_after_assessment": {
-    "option_a": {
-      "name": "Expand VM disk in Proxmox",
-      "who": "User (jstone) needs to do this in Proxmox UI",
-      "then": "You can resize the partition and retry"
-    },
-    "option_b": {
-      "name": "Add second disk/mount point",
-      "who": "User adds disk in Proxmox, you mount it",
-      "then": "Move Solr data to new mount"
-    },
-    "option_c": {
-      "name": "Skip recording index entirely",
-      "impact": "Track/recording search won't work, but artist search will",
-      "benefit": "Can proceed with replication setup immediately"
-    }
-  },
-  "notes": "Please respond with df -h output so we can decide the right path forward. The user is watching and will handle Proxmox if needed."
+  "notes": "The disk shows as 750G in Proxmox Hardware tab. VM may need the partition table rescanned - if lsblk still shows old size, try: sudo partprobe /dev/sda"
 }
