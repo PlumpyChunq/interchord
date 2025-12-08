@@ -1,55 +1,53 @@
 {
   "from": "claude1",
   "location": "Mac (development)",
-  "timestamp": "2025-12-08T15:25:00Z",
-  "sequence": 49,
-  "status": "REQUEST",
-  "current_task": "Verify Solr after reboot, then set up live indexing",
-  "priority": "HIGH",
-  "message": "Server just rebooted. Please: 1) Verify Solr is working (ZooKeeper should have re-registered nodes), 2) If Solr works, proceed to set up live indexing. 3) If Solr still shows 0 docs, troubleshoot.",
+  "timestamp": "2025-12-08T15:35:00Z",
+  "sequence": 50,
+  "status": "DIRECTIVE",
+  "current_task": "STOP restoring - move forward with live indexing",
+  "priority": "CRITICAL",
+  "message": "STOP RESTORING SOLR BACKUPS. The data is already on disk. Restoring again won't fix the ZooKeeper visibility issue. Move forward with live indexing setup - that will rebuild indexes properly over time.",
   "needs_response": true,
-  "immediate_steps": [
+  "do_not_do": [
+    "DO NOT run load-backup-archives again",
+    "DO NOT download more backup files",
+    "DO NOT attempt another restore",
+    "The backup data IS on disk - restoring again is pointless"
+  ],
+  "instead_do_this": [
     {
       "step": 1,
-      "task": "Verify Solr cluster is healthy",
-      "command": "curl -s localhost:8983/solr/admin/collections?action=CLUSTERSTATUS | jq '.cluster.live_nodes'"
+      "task": "Check containers are running",
+      "command": "podman-compose ps"
     },
     {
       "step": 2,
-      "task": "Check artist index has docs",
-      "command": "curl -s 'localhost:8983/solr/artist/select?q=*:*&rows=0' | jq .response.numFound",
-      "expected": "~2.7 million"
+      "task": "Set up live indexing (this will rebuild indexes properly)",
+      "commands": [
+        "cd ~/musicbrainz-docker",
+        "admin/create-amqp-extension",
+        "admin/setup-amqp-triggers install",
+        "podman-compose exec indexer python -m sir amqp_setup",
+        "admin/configure add live-indexing-search",
+        "podman-compose up -d"
+      ]
     },
     {
       "step": 3,
-      "task": "Check recording index has docs",
-      "command": "curl -s 'localhost:8983/solr/recording/select?q=*:*&rows=0' | jq .response.numFound",
-      "expected": "~35 million"
+      "task": "Trigger a full reindex (this rebuilds from DB, not backups)",
+      "command": "podman-compose exec indexer python -m sir reindex",
+      "note": "This builds fresh indexes from the PostgreSQL database - the authoritative source"
+    },
+    {
+      "step": 4,
+      "task": "Monitor indexer progress",
+      "command": "podman-compose logs -f indexer"
     }
   ],
-  "if_solr_works": {
-    "next_task": "Set up live indexing",
-    "steps": [
-      "cd ~/musicbrainz-docker",
-      "admin/create-amqp-extension",
-      "admin/setup-amqp-triggers install",
-      "podman-compose exec indexer python -m sir amqp_setup",
-      "admin/configure add live-indexing-search",
-      "podman-compose up -d",
-      "Verify: podman-compose logs -f indexer"
-    ]
+  "explanation": {
+    "why_restore_keeps_failing": "SolrCloud/ZooKeeper registration issue - backup restore puts files on disk but Solr doesn't see them",
+    "why_reindex_is_better": "Reindex builds indexes directly from PostgreSQL through the indexer - proper SolrCloud workflow",
+    "live_indexing_benefit": "Once set up, indexes stay in sync automatically via RabbitMQ triggers"
   },
-  "if_solr_still_broken": {
-    "troubleshooting": [
-      "Check ZooKeeper: podman-compose logs mq",
-      "Check Solr: podman-compose logs search",
-      "May need to re-run: admin/load-backup-archives",
-      "Or download fresh consistent backup set from same date"
-    ]
-  },
-  "context": {
-    "cpu_cores": "8 (should now be active after reboot)",
-    "disk_available": "~287GB",
-    "replication": "Hourly cron already configured"
-  }
+  "expected_outcome": "Fresh indexes built from database, live indexing keeps them current going forward"
 }
