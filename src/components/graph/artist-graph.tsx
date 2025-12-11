@@ -306,6 +306,7 @@ export function ArtistGraph({
   } | null>(null);
   const [hiddenNodes, setHiddenNodes] = useState<Set<string>>(new Set());
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
+  const [showInstructions, setShowInstructions] = useState(true);
 
   // Performance: Pause simulation after inactivity to save CPU/battery
   const INACTIVITY_TIMEOUT_MS = 5000;  // Pause after 5 seconds of no interaction
@@ -1296,11 +1297,29 @@ export function ArtistGraph({
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-lg shadow-sm text-xs text-gray-600">
-        <p>Click node to select • Double-click to expand</p>
-        <p>Drag nodes to reposition • Others react in real-time</p>
-        <p>Right-click for options • Scroll to zoom</p>
+      {/* Instructions - collapsible */}
+      <div className="absolute top-2 right-2">
+        {showInstructions ? (
+          <div className="bg-white/80 backdrop-blur px-2 py-1.5 rounded shadow-sm text-[10px] text-gray-500 leading-tight">
+            <button
+              onClick={() => setShowInstructions(false)}
+              className="absolute -top-1 -right-1 w-4 h-4 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-500 text-[10px] leading-none flex items-center justify-center"
+              title="Hide tips"
+            >
+              ×
+            </button>
+            <p>Click to select • Right-click for options</p>
+            <p>Drag to move • Scroll to zoom</p>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowInstructions(true)}
+            className="bg-white/80 backdrop-blur px-1.5 py-1 rounded shadow-sm text-[10px] text-gray-400 hover:text-gray-600"
+            title="Show tips"
+          >
+            ?
+          </button>
+        )}
       </div>
 
       {/* Layout indicator */}

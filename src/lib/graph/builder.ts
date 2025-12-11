@@ -28,13 +28,19 @@ export function isFoundingMember(
 ): boolean {
   if (rel.type !== 'member_of') return false;
 
+  // Only mark as founding if there's explicit "founder" attribute
   const hasFoundingAttribute = rel.attributes?.some(
     attr => attr.toLowerCase().includes('found')
   );
   if (hasFoundingAttribute) return true;
 
-  const startYear = parseYear(rel.period?.begin) ?? 9999;
-  return startYear <= earliestYear + 1;
+  // Or if their start year exactly matches the earliest known member year
+  const startYear = parseYear(rel.period?.begin);
+  if (startYear && startYear === earliestYear) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getEarliestMemberYear(
