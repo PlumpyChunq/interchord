@@ -47,6 +47,13 @@ services:
       - APPLE_MUSIC_TEAM_ID=${APPLE_MUSIC_TEAM_ID}
       - APPLE_MUSIC_KEY_ID=${APPLE_MUSIC_KEY_ID}
       - APPLE_MUSIC_PRIVATE_KEY=${APPLE_MUSIC_PRIVATE_KEY}
+      # Supplement Database (Wikipedia data caching)
+      - SUPPLEMENT_DB_HOST=${SUPPLEMENT_DB_HOST:-interchord-db}
+      - SUPPLEMENT_DB_PORT=${SUPPLEMENT_DB_PORT:-5432}
+      - SUPPLEMENT_DB_NAME=${SUPPLEMENT_DB_NAME:-interchord}
+      - SUPPLEMENT_DB_USER=${SUPPLEMENT_DB_USER:-interchord}
+      - SUPPLEMENT_DB_PASSWORD=${SUPPLEMENT_DB_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
       interchord-db:
         condition: service_healthy
