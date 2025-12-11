@@ -40,16 +40,16 @@ export async function getOrCreateSupplementData(
 
   // Check if database is available
   const dbAvailable = await testConnection();
-  if (!dbAvailable) {
-    console.warn('[Supplement] Database not available, skipping enrichment');
-    return null;
-  }
 
-  // Check for cached data first
-  const cached = await getSupplementData(mbid);
-  if (cached) {
-    console.log(`[Supplement] Cache hit for ${artistName}`);
-    return cached;
+  // Check for cached data first (if DB available)
+  if (dbAvailable) {
+    const cached = await getSupplementData(mbid);
+    if (cached) {
+      console.log(`[Supplement] Cache hit for ${artistName}`);
+      return cached;
+    }
+  } else {
+    console.warn('[Supplement] Database not available, will fetch but not cache');
   }
 
   // Cache miss - fetch from Wikipedia
@@ -75,15 +75,17 @@ export async function getOrCreateSupplementData(
 
   if (extracted.foundingMembers.length === 0) {
     console.log(`[Supplement] No founding members found in Wikipedia for ${artistName}`);
-    // Still store the result to avoid re-fetching
-    await storeSupplementData(
-      mbid,
-      artistName,
-      wikipedia.title,
-      wikipedia.extract,
-      extracted,
-      []
-    );
+    // Store the result to avoid re-fetching (if DB available)
+    if (dbAvailable) {
+      await storeSupplementData(
+        mbid,
+        artistName,
+        wikipedia.title,
+        wikipedia.extract,
+        extracted,
+        []
+      );
+    }
     return {
       artist: {
         mbid,
@@ -91,6 +93,7 @@ export async function getOrCreateSupplementData(
         wikipediaTitle: wikipedia.title,
         formationYear: extracted.formationYear,
         formationCity: extracted.formationCity,
+        formationState: extracted.formationState,
         formationCountry: extracted.formationCountry,
         wikipediaExtract: wikipedia.extract,
         parsedAt: new Date(),
@@ -109,18 +112,20 @@ export async function getOrCreateSupplementData(
     `matched ${matchResults.filter((m) => m.matchedMbid).length} to MusicBrainz`
   );
 
-  // Store in database
-  const stored = await storeSupplementData(
-    mbid,
-    artistName,
-    wikipedia.title,
-    wikipedia.extract,
-    extracted,
-    matchResults
-  );
+  // Store in database (if available)
+  if (dbAvailable) {
+    const stored = await storeSupplementData(
+      mbid,
+      artistName,
+      wikipedia.title,
+      wikipedia.extract,
+      extracted,
+      matchResults
+    );
 
-  if (!stored) {
-    console.warn(`[Supplement] Failed to store data for ${artistName}`);
+    if (!stored) {
+      console.warn(`[Supplement] Failed to store data for ${artistName}`);
+    }
   }
 
   // Build result
@@ -138,6 +143,7 @@ export async function getOrCreateSupplementData(
       wikipediaTitle: wikipedia.title,
       formationYear: extracted.formationYear,
       formationCity: extracted.formationCity,
+      formationState: extracted.formationState,
       formationCountry: extracted.formationCountry,
       wikipediaExtract: wikipedia.extract,
       parsedAt: new Date(),

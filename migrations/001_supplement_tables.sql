@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS artist_supplement (
     wikipedia_title VARCHAR(255),
     formation_year INTEGER,
     formation_city VARCHAR(255),
+    formation_state VARCHAR(255),
     formation_country VARCHAR(255),
     wikipedia_extract TEXT,
     parsed_at TIMESTAMP WITH TIME ZONE,

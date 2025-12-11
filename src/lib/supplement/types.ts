@@ -6,6 +6,7 @@ export interface ArtistSupplement {
   wikipediaTitle?: string;
   formationYear?: number;
   formationCity?: string;
+  formationState?: string;
   formationCountry?: string;
   wikipediaExtract?: string;
   parsedAt?: Date;

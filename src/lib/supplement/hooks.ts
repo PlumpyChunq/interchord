@@ -5,6 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import type { SupplementData } from './types';
 
 /**
@@ -48,4 +49,62 @@ export function useSupplementData(
     staleTime: 1000 * 60 * 60, // 1 hour
     retry: false, // Don't retry if Wikipedia fails
   });
+}
+
+/**
+ * Background enrichment for favorite groups
+ *
+ * Pre-warms the cache by fetching Wikipedia data for favorites.
+ * Runs lazily with delays to avoid overwhelming Wikipedia.
+ * Only processes the 10 most recent group favorites.
+ */
+export function useBackgroundEnrichment(
+  favorites: Array<{ id: string; name: string; type: string }>,
+  enabled: boolean = true
+) {
+  const enrichedRef = useRef<Set<string>>(new Set());
+  const isEnrichingRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || isEnrichingRef.current) return;
+
+    // Only process groups, limit to 10
+    const groups = favorites
+      .filter((f) => f.type === 'group')
+      .filter((f) => !enrichedRef.current.has(f.id))
+      .slice(0, 10);
+
+    if (groups.length === 0) return;
+
+    isEnrichingRef.current = true;
+
+    // Process in background with delays
+    const enrichAsync = async () => {
+      for (const group of groups) {
+        try {
+          // Fetch supplement data (will cache if DB available, otherwise just warm memory)
+          const response = await fetch(
+            `/api/supplement?mbid=${encodeURIComponent(group.id)}&name=${encodeURIComponent(group.name)}`
+          );
+
+          if (response.ok) {
+            enrichedRef.current.add(group.id);
+          }
+
+          // Wait 2 seconds between requests to be nice to Wikipedia
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        } catch {
+          // Silently ignore failures - this is background work
+        }
+      }
+      isEnrichingRef.current = false;
+    };
+
+    // Start after a delay (let the UI settle first)
+    const timeoutId = setTimeout(enrichAsync, 5000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [favorites, enabled]);
 }

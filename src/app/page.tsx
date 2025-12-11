@@ -8,6 +8,7 @@ import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
 import { SettingsDropdown } from '@/components/settings-dropdown';
 import { MusicBrainzStatus } from '@/components/musicbrainz-status';
 import { useFavorites } from '@/lib/favorites';
+import { useBackgroundEnrichment } from '@/lib/supplement/hooks';
 import Image from 'next/image';
 import type {
   ArtistNode,
@@ -189,7 +190,11 @@ function EntityDetail({
 export default function Home() {
   const [selectedArtist, setSelectedArtist] = useState<ArtistNode | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
-  const { favoriteNames, isLoaded } = useFavorites();
+  const { favorites, favoriteNames, isLoaded } = useFavorites();
+
+  // Background enrichment: pre-warm supplement cache for favorite groups
+  // Only runs on home page when nothing is selected, after 5 second delay
+  useBackgroundEnrichment(favorites, isLoaded && !selectedArtist && !selectedEntity);
 
   // Handle back navigation
   const handleBack = () => {

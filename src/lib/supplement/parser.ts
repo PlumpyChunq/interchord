@@ -80,30 +80,46 @@ function extractFormationLocation(text: string): {
   state?: string;
   country?: string;
 } | undefined {
-  // Pattern: "formed in City, State" or "formed in City, Country"
+  // Pattern: "formed in City, State, by ..." or "formed in City, State in YYYY"
   // Examples:
-  //   "formed in San Antonio, Texas"
-  //   "formed in London, England"
+  //   "formed in San Antonio, Texas, by ..."
+  //   "formed in London, England in 1985"
   //   "formed in Seattle, Washington, United States"
-  const locationMatch = text.match(
-    /(?:formed|founded|based)\s+in\s+([A-Z][a-zA-Z\s]+?)(?:,\s*([A-Z][a-zA-Z\s]+?))?(?:,\s*([A-Z][a-zA-Z\s]+?))?(?:\s+(?:by|in\s+\d))/i
+
+  // Two-step approach: first find the verb phrase, then extract location parts
+  // This avoids /i flag issues with [A-Z] character classes
+  const verbMatch = text.match(/(?:formed|founded|based)\s+in\s+/i);
+  if (!verbMatch || verbMatch.index === undefined) {
+    return undefined;
+  }
+
+  // Get text after "formed in "
+  const afterVerb = text.slice(verbMatch.index + verbMatch[0].length);
+
+  // Extract location parts: comma-separated words starting with uppercase
+  // Stop at: ", by " or " by " or " in YYYY" or end of sentence
+  const locationMatch = afterVerb.match(
+    /^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:,\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)*)(?:,?\s+by\s|\s+in\s+\d{4}|[.,]|$)/
   );
 
-  if (locationMatch) {
-    const parts = [locationMatch[1], locationMatch[2], locationMatch[3]]
-      .filter(Boolean)
-      .map((p) => p?.trim());
+  if (!locationMatch) {
+    return undefined;
+  }
 
-    if (parts.length === 1) {
-      // Just city or country
-      return { city: parts[0] };
-    } else if (parts.length === 2) {
-      // City, State/Country
-      return { city: parts[0], state: parts[1] };
-    } else if (parts.length === 3) {
-      // City, State, Country
-      return { city: parts[0], state: parts[1], country: parts[2] };
-    }
+  const locationString = locationMatch[1];
+
+  // Split by comma and clean up
+  const parts = locationString
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && /^[A-Z]/.test(p)); // Must start with uppercase
+
+  if (parts.length === 1) {
+    return { city: parts[0] };
+  } else if (parts.length === 2) {
+    return { city: parts[0], state: parts[1] };
+  } else if (parts.length >= 3) {
+    return { city: parts[0], state: parts[1], country: parts[2] };
   }
 
   // Simpler pattern: "from City" at beginning
@@ -182,9 +198,39 @@ function extractFoundingMembers(text: string): ExtractedMember[] {
   return members;
 }
 
+// Common role prefixes that appear before names in Wikipedia
+const ROLE_PREFIXES = [
+  'singer', 'vocalist', 'lead singer', 'frontman', 'frontwoman',
+  'guitarist', 'lead guitarist', 'rhythm guitarist', 'bassist', 'bass player',
+  'drummer', 'percussionist', 'keyboardist', 'pianist', 'saxophonist',
+  'musician', 'multi-instrumentalist', 'producer', 'songwriter',
+  'founding member', 'co-founder', 'founder',
+];
+
+/**
+ * Strip role prefixes from a name string
+ * "singer Gibby Haynes" -> "Gibby Haynes"
+ * "guitarist Paul Leary" -> "Paul Leary"
+ */
+function stripRolePrefix(text: string): { name: string; role?: string } {
+  const lower = text.toLowerCase();
+
+  for (const prefix of ROLE_PREFIXES) {
+    if (lower.startsWith(prefix + ' ')) {
+      return {
+        name: text.slice(prefix.length + 1).trim(),
+        role: prefix,
+      };
+    }
+  }
+
+  return { name: text };
+}
+
 /**
  * Extract names from a comma/and separated list
  * "Gibby Haynes and Paul Leary" -> [{name: "Gibby Haynes"}, {name: "Paul Leary"}]
+ * "singer Gibby Haynes and guitarist Paul Leary" -> same result (strips roles)
  */
 function extractNamesFromList(text: string): ExtractedMember[] {
   const members: ExtractedMember[] = [];
@@ -196,14 +242,25 @@ function extractNamesFromList(text: string): ExtractedMember[] {
     .filter((p) => p.length > 0);
 
   for (const part of parts) {
-    // Extract name and optional instruments
-    const withInstrMatch = part.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*(?:\(([^)]+)\))?/);
+    // Strip role prefix first (e.g., "singer Gibby Haynes" -> "Gibby Haynes")
+    const { name: strippedPart, role } = stripRolePrefix(part);
+
+    // Extract name and optional instruments in parentheses
+    const withInstrMatch = strippedPart.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*(?:\(([^)]+)\))?/);
 
     if (withInstrMatch) {
       const name = withInstrMatch[1].trim();
-      const instruments = withInstrMatch[2]
+      let instruments = withInstrMatch[2]
         ? extractInstrumentsFromText(withInstrMatch[2])
         : undefined;
+
+      // If we stripped a role that's an instrument, add it
+      if (role && !instruments) {
+        const roleInstrument = extractInstrumentsFromText(role);
+        if (roleInstrument.length > 0) {
+          instruments = roleInstrument;
+        }
+      }
 
       // Validate it looks like a person name (at least first and last name)
       if (isValidPersonName(name)) {

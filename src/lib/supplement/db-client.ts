@@ -98,6 +98,7 @@ export async function getSupplementData(mbid: string): Promise<SupplementData | 
         wikipedia_title: string | null;
         formation_year: number | null;
         formation_city: string | null;
+        formation_state: string | null;
         formation_country: string | null;
         wikipedia_extract: string | null;
         parsed_at: Date | null;
@@ -156,6 +157,7 @@ export async function getSupplementData(mbid: string): Promise<SupplementData | 
           wikipediaTitle: artistRow.wikipedia_title ?? undefined,
           formationYear: artistRow.formation_year ?? undefined,
           formationCity: artistRow.formation_city ?? undefined,
+          formationState: artistRow.formation_state ?? undefined,
           formationCountry: artistRow.formation_country ?? undefined,
           wikipediaExtract: artistRow.wikipedia_extract ?? undefined,
           parsedAt: artistRow.parsed_at ?? undefined,
@@ -192,13 +194,14 @@ export async function storeSupplementData(
       // Upsert artist supplement
       await client.query(
         `INSERT INTO artist_supplement
-         (mbid, name, wikipedia_title, formation_year, formation_city, formation_country, wikipedia_extract, parsed_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         (mbid, name, wikipedia_title, formation_year, formation_city, formation_state, formation_country, wikipedia_extract, parsed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (mbid) DO UPDATE SET
            name = EXCLUDED.name,
            wikipedia_title = EXCLUDED.wikipedia_title,
            formation_year = EXCLUDED.formation_year,
            formation_city = EXCLUDED.formation_city,
+           formation_state = EXCLUDED.formation_state,
            formation_country = EXCLUDED.formation_country,
            wikipedia_extract = EXCLUDED.wikipedia_extract,
            parsed_at = NOW()`,
@@ -208,6 +211,7 @@ export async function storeSupplementData(
           wikipediaTitle,
           extracted.formationYear ?? null,
           extracted.formationCity ?? null,
+          extracted.formationState ?? null,
           extracted.formationCountry ?? null,
           wikipediaExtract,
         ]
