@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { ArtistGraph, ArtistNode, ArtistRelationship } from '@/types';
 import type { ExpansionDepth } from './types';
 import { buildGraphData, mergeGraphData } from './builder';
@@ -10,6 +10,61 @@ interface RelationshipsData {
   artist: ArtistNode;
   relationships: ArtistRelationship[];
   relatedArtists: ArtistNode[];
+}
+
+interface SupplementDataResponse {
+  foundingMemberMbids: string[];
+}
+
+/**
+ * Fetch supplementary data (founding members from Wikipedia) for a band
+ * Only fetches for groups, returns null for solo artists
+ */
+async function getSupplementDataCached(
+  mbid: string,
+  name: string,
+  type: string
+): Promise<Set<string> | null> {
+  // Only fetch for groups/bands
+  if (type !== 'group') return null;
+
+  const cacheKey = `supplement-founders-${mbid}`;
+
+  // Check localStorage cache first
+  const cached = cacheGet<string[]>(cacheKey);
+  if (cached) {
+    console.log(`[Cache HIT] Supplement founders for ${name}`);
+    return new Set(cached);
+  }
+
+  console.log(`[Cache MISS] Fetching supplement founders for ${name}`);
+
+  try {
+    const response = await fetch(
+      `/api/supplement?mbid=${encodeURIComponent(mbid)}&name=${encodeURIComponent(name)}`
+    );
+
+    if (!response.ok) {
+      // Not found is okay - not all bands have Wikipedia data
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch supplement: ${response.status}`);
+    }
+
+    const data: SupplementDataResponse = await response.json();
+    const founders = data.foundingMemberMbids || [];
+
+    // Cache for 1 week
+    cacheSet(cacheKey, founders, CacheTTL.LONG);
+
+    console.log(`[Cache SET] Supplement founders for ${name}: ${founders.length} members`);
+
+    return founders.length > 0 ? new Set(founders) : null;
+  } catch (error) {
+    console.warn('Failed to fetch supplement data:', error);
+    return null;
+  }
 }
 
 /**
@@ -78,6 +133,30 @@ export function useGraphExpansion(
   const [expansionDepth, setExpansionDepth] = useState<ExpansionDepth>(1);
   const [expandProgress, setExpandProgress] = useState<{ current: number; total: number } | null>(null);
 
+  // Supplementary founders from Wikipedia
+  const [supplementaryFounders, setSupplementaryFounders] = useState<Set<string> | null>(null);
+  const supplementFetchedRef = useRef<string | null>(null);
+
+  // Fetch supplement data when initial data loads (for bands only)
+  useEffect(() => {
+    if (!initialData || supplementFetchedRef.current === artistId) return;
+    if (initialData.artist.type !== 'group') return;
+
+    supplementFetchedRef.current = artistId;
+
+    // Fetch in background (non-blocking)
+    getSupplementDataCached(
+      initialData.artist.id,
+      initialData.artist.name,
+      initialData.artist.type
+    ).then((founders) => {
+      if (founders && founders.size > 0) {
+        console.log(`[Supplement] Found ${founders.size} Wikipedia founders for ${initialData.artist.name}`);
+        setSupplementaryFounders(founders);
+      }
+    });
+  }, [initialData, artistId]);
+
   // Build initial graph data from relationships
   const initialGraphData = useMemo<ArtistGraph>(() => {
     if (!initialData) return { nodes: [], edges: [] };
@@ -85,9 +164,10 @@ export function useGraphExpansion(
       initialData.artist,
       initialData.relationships,
       initialData.relatedArtists,
-      initialData.artist.activeYears?.begin
+      initialData.artist.activeYears?.begin,
+      supplementaryFounders ?? undefined
     );
-  }, [initialData]);
+  }, [initialData, supplementaryFounders]);
 
   // Use expanded graph if available, otherwise initial
   const graphData = expandedGraph || initialGraphData;
@@ -114,7 +194,8 @@ export function useGraphExpansion(
       initialData.artist,
       initialData.relationships,
       initialData.relatedArtists,
-      initialData.artist.activeYears?.begin
+      initialData.artist.activeYears?.begin,
+      supplementaryFounders ?? undefined
     );
 
     if (depth === 1) {
@@ -180,7 +261,7 @@ export function useGraphExpansion(
     setExpandedGraph(currentGraph);
     setIsExpanding(false);
     setExpandProgress(null);
-  }, [initialData, isExpanding]);
+  }, [initialData, isExpanding, supplementaryFounders]);
 
   // Auto-expand when data loads
   useEffect(() => {

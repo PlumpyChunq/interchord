@@ -24,11 +24,19 @@ export function formatTenure(begin?: string, end?: string | null): string {
 
 export function isFoundingMember(
   rel: ArtistRelationship,
-  earliestYear: number
+  earliestYear: number,
+  supplementaryFounders?: Set<string>
 ): boolean {
   if (rel.type !== 'member_of') return false;
 
-  // Only mark as founding if there's explicit "founder" attribute
+  // Check Wikipedia-derived supplementary data first (most reliable)
+  if (supplementaryFounders) {
+    if (supplementaryFounders.has(rel.target) || supplementaryFounders.has(rel.source)) {
+      return true;
+    }
+  }
+
+  // Check for explicit "founder" attribute in MusicBrainz
   const hasFoundingAttribute = rel.attributes?.some(
     attr => attr.toLowerCase().includes('found')
   );
@@ -62,7 +70,8 @@ export function getEarliestMemberYear(
 export function groupRelationshipsByType(
   relationships: ArtistRelationship[],
   relatedArtists: ArtistNode[],
-  bandStartYear?: string
+  bandStartYear?: string,
+  supplementaryFounders?: Set<string>
 ): Map<string, GroupedItem[]> {
   const artistMap = new Map(relatedArtists.map(a => [a.id, a]));
   const grouped = new Map<string, GroupedItem[]>();
@@ -84,7 +93,7 @@ export function groupRelationshipsByType(
       const periodEnd = rel.period?.end ?? artist.activeYears?.end;
 
       const startYear = parseYear(periodBegin) ?? 9999;
-      const founding = isFoundingMember(rel, earliestYear);
+      const founding = isFoundingMember(rel, earliestYear, supplementaryFounders);
       const isCurrent = periodEnd === null || periodEnd === undefined;
       const tenure = formatTenure(periodBegin, periodEnd);
 
@@ -117,7 +126,8 @@ export function buildGraphData(
   centerArtist: ArtistNode,
   relationships: ArtistRelationship[],
   relatedArtists: ArtistNode[],
-  bandStartYear?: string
+  bandStartYear?: string,
+  supplementaryFounders?: Set<string>
 ): ArtistGraph {
   const earliestYear = getEarliestMemberYear(relationships, bandStartYear);
 
@@ -128,7 +138,7 @@ export function buildGraphData(
   for (const rel of relationships) {
     const relatedId = rel.target !== centerArtist.id ? rel.target : rel.source;
     if (!foundingMap.has(relatedId)) {
-      foundingMap.set(relatedId, isFoundingMember(rel, earliestYear));
+      foundingMap.set(relatedId, isFoundingMember(rel, earliestYear, supplementaryFounders));
     }
     // Collect instruments from relationship attributes
     const instruments = extractInstruments(rel.attributes);
