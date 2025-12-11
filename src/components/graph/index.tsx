@@ -14,6 +14,8 @@ interface GraphViewProps {
   onNodeExpand?: (artistId: string) => void;
   /** Called when hovering over a node in the graph. Receives null when mouse leaves. */
   onNodeHover?: (artistId: string | null) => void;
+  /** Called when user wants to switch focus to a different artist (right-click -> "Focus on artist") */
+  onFocusArtist?: (artist: ArtistNode) => void;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
   layoutType?: LayoutType;
@@ -28,6 +30,7 @@ export function GraphView({
   onNodeClick,
   onNodeExpand,
   onNodeHover,
+  onFocusArtist,
   selectedNodeId,
   hoveredNodeId,
   layoutType = 'auto',
@@ -66,6 +69,7 @@ export function GraphView({
         onNodeClick={onNodeClick}
         onNodeExpand={onNodeExpand}
         onNodeHover={onNodeHover}
+        onFocusArtist={onFocusArtist}
         selectedNodeId={selectedNodeId}
         hoveredNodeId={hoveredNodeId}
         className="h-full"

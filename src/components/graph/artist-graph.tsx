@@ -43,6 +43,9 @@ interface ArtistGraphProps {
   onNodeExpand?: (artistId: string) => void;
   /** Called when hovering over a node in the graph. Receives null when mouse leaves. */
   onNodeHover?: (artistId: string | null) => void;
+  /** Called when user wants to switch focus to a different artist (right-click -> "Focus on artist")
+   *  This changes header/albums/timeline but keeps graph connections intact */
+  onFocusArtist?: (artist: ArtistNode) => void;
   selectedNodeId?: string | null;
   hoveredNodeId?: string | null;
   className?: string;
@@ -269,6 +272,7 @@ export function ArtistGraph({
   onNodeClick,
   onNodeExpand,
   onNodeHover,
+  onFocusArtist,
   selectedNodeId,
   hoveredNodeId,
   className = '',
@@ -298,6 +302,7 @@ export function ArtistGraph({
     isHidden: boolean;
     isPinned: boolean;
     isLoaded: boolean;
+    isRoot: boolean;
   } | null>(null);
   const [hiddenNodes, setHiddenNodes] = useState<Set<string>>(new Set());
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
@@ -315,9 +320,11 @@ export function ArtistGraph({
   const onNodeClickRef = useRef(onNodeClick);
   const onNodeExpandRef = useRef(onNodeExpand);
   const onNodeHoverRef = useRef(onNodeHover);
+  const onFocusArtistRef = useRef(onFocusArtist);
   onNodeClickRef.current = onNodeClick;
   onNodeExpandRef.current = onNodeExpand;
   onNodeHoverRef.current = onNodeHover;
+  onFocusArtistRef.current = onFocusArtist;
 
   // Refs to store timer functions (avoids circular dependency with getLayoutOptions)
   const pauseSimulationRef = useRef<() => void>(() => {});
@@ -905,9 +912,6 @@ export function ArtistGraph({
       const node = event.target;
       const nodeData = node.data();
 
-      // Don't allow hiding the root node
-      if (nodeData.root === 'true') return;
-
       // Get screen position for the menu
       const renderedPos = node.renderedPosition();
       const containerRect = containerRef.current?.getBoundingClientRect();
@@ -922,6 +926,7 @@ export function ArtistGraph({
         isHidden: hiddenNodes.has(nodeData.id),
         isPinned: node.locked(),
         isLoaded: nodeData.loaded === 'true',
+        isRoot: nodeData.root === 'true',
       });
     });
 
@@ -1361,6 +1366,27 @@ export function ArtistGraph({
           <div className="px-3 py-1.5 text-xs text-gray-500 border-b">
             {contextMenu.nodeName}
           </div>
+          {/* Focus on this artist - switch header/albums/timeline to this artist */}
+          {!contextMenu.isRoot && (
+            <button
+              onClick={() => {
+                if (onFocusArtistRef.current) {
+                  const artist: ArtistNode = {
+                    id: contextMenu.nodeId,
+                    name: contextMenu.nodeName,
+                    type: contextMenu.nodeType,
+                    loaded: contextMenu.isLoaded,
+                  };
+                  onFocusArtistRef.current(artist);
+                }
+                setContextMenu(null);
+              }}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2 text-purple-600 font-medium"
+            >
+              <span>🎯</span>
+              <span>Focus on this {contextMenu.nodeType === 'group' ? 'band' : 'artist'}</span>
+            </button>
+          )}
           {/* Expand connections option - only for unexpanded nodes */}
           {!contextMenu.isLoaded && (
             <button
@@ -1376,7 +1402,7 @@ export function ArtistGraph({
               <span>Expand connections</span>
             </button>
           )}
-          {!contextMenu.isLoaded && <div className="border-t my-1" />}
+          {(!contextMenu.isRoot || !contextMenu.isLoaded) && <div className="border-t my-1" />}
           {/* Pin/Unpin option */}
           <button
             onClick={() => {
@@ -1413,51 +1439,55 @@ export function ArtistGraph({
             )}
           </button>
           <div className="border-t my-1" />
-          {/* Hide/Show option */}
-          <button
-            onClick={() => {
-              const newHidden = new Set(hiddenNodes);
-              if (newHidden.has(contextMenu.nodeId)) {
-                newHidden.delete(contextMenu.nodeId);
-              } else {
-                newHidden.add(contextMenu.nodeId);
-              }
-              setHiddenNodes(newHidden);
-              setContextMenu(null);
-            }}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            {hiddenNodes.has(contextMenu.nodeId) ? (
-              <>
-                <span>👁️</span>
-                <span>Show this {contextMenu.nodeType}</span>
-              </>
-            ) : (
-              <>
+          {/* Hide/Show option - not available for root node */}
+          {!contextMenu.isRoot && (
+            <>
+              <button
+                onClick={() => {
+                  const newHidden = new Set(hiddenNodes);
+                  if (newHidden.has(contextMenu.nodeId)) {
+                    newHidden.delete(contextMenu.nodeId);
+                  } else {
+                    newHidden.add(contextMenu.nodeId);
+                  }
+                  setHiddenNodes(newHidden);
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              >
+                {hiddenNodes.has(contextMenu.nodeId) ? (
+                  <>
+                    <span>👁️</span>
+                    <span>Show this {contextMenu.nodeType}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚫</span>
+                    <span>Hide this {contextMenu.nodeType}</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  // Hide all nodes of this type
+                  const cy = cyRef.current;
+                  if (!cy) return;
+                  const newHidden = new Set(hiddenNodes);
+                  cy.nodes().forEach(node => {
+                    if (node.data('type') === contextMenu.nodeType && node.data('root') !== 'true') {
+                      newHidden.add(node.id());
+                    }
+                  });
+                  setHiddenNodes(newHidden);
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+              >
                 <span>🚫</span>
-                <span>Hide this {contextMenu.nodeType}</span>
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => {
-              // Hide all nodes of this type
-              const cy = cyRef.current;
-              if (!cy) return;
-              const newHidden = new Set(hiddenNodes);
-              cy.nodes().forEach(node => {
-                if (node.data('type') === contextMenu.nodeType && node.data('root') !== 'true') {
-                  newHidden.add(node.id());
-                }
-              });
-              setHiddenNodes(newHidden);
-              setContextMenu(null);
-            }}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <span>🚫</span>
-            <span>Hide all {contextMenu.nodeType === 'person' ? 'people' : 'groups'}</span>
-          </button>
+                <span>Hide all {contextMenu.nodeType === 'person' ? 'people' : 'groups'}</span>
+              </button>
+            </>
+          )}
           <div className="border-t my-1" />
           <button
             onClick={() => setContextMenu(null)}

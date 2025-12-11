@@ -39,23 +39,43 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const [highlightedAlbum, setHighlightedAlbum] = useState<{ name: string; year: number; source: 'timeline' | 'sidebar' } | null>(null);
   const [timelineHeight, setTimelineHeight] = useState(TIMELINE_DEFAULT_HEIGHT);
 
-  // Sync favorite state when artist changes (useSyncExternalStore pattern alternative)
-  const currentIsFav = isFavorite(artist.id);
+  // Focused artist - which artist's info (header, albums, timeline) to display
+  // Defaults to the original artist, but can be changed via right-click "Focus on this artist"
+  // Uses lazy initializer with artist.id as key to auto-reset when artist prop changes
+  const [focusedArtist, setFocusedArtist] = useState<ArtistNode>(() => artist);
+  const [focusedArtistKey, setFocusedArtistKey] = useState(artist.id);
+
+  // Reset focused artist when the main artist prop changes (new search)
+  // This pattern avoids useEffect while still detecting prop changes
+  const effectiveFocusedArtist = artist.id !== focusedArtistKey ? artist : focusedArtist;
+  if (artist.id !== focusedArtistKey) {
+    setFocusedArtistKey(artist.id);
+    setFocusedArtist(artist);
+  }
+
+  // Sync favorite state when focused artist changes (useSyncExternalStore pattern alternative)
+  const currentIsFav = isFavorite(effectiveFocusedArtist.id);
   if (currentIsFav !== isFav) {
     setIsFav(currentIsFav);
   }
 
   const handleToggleFavorite = useCallback(() => {
     if (isFav) {
-      removeFromFavorites(artist.id);
+      removeFromFavorites(effectiveFocusedArtist.id);
       setIsFav(false);
     } else {
-      addToFavorites(artist);
+      addToFavorites(effectiveFocusedArtist);
       setIsFav(true);
     }
-  }, [artist, isFav]);
+  }, [effectiveFocusedArtist, isFav]);
 
+  // Graph data uses the original artist (root of the graph)
   const { data, isLoading, error } = useArtistRelationships(artist.id);
+
+  // Focused artist relationships (for sidebar info when viewing a different artist)
+  const { data: focusedData } = useArtistRelationships(
+    effectiveFocusedArtist.id !== artist.id ? effectiveFocusedArtist.id : ''
+  );
 
   // Graph expansion hook - manages all graph state
   const {
@@ -70,29 +90,32 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     hasExpandedGraph,
   } = useGraphExpansion(artist.id, data);
 
-  // Enrich artist with Apple Music data (image, albums)
-  const { data: enrichedArtist } = useEnrichedArtist(artist);
-  const displayArtist = enrichedArtist || artist;
+  // Enrich focused artist with Apple Music data (image, albums)
+  const { data: enrichedArtist } = useEnrichedArtist(effectiveFocusedArtist);
+  const displayArtist = enrichedArtist || effectiveFocusedArtist;
 
-  // Fetch artist bio from Wikipedia
+  // Fetch focused artist bio from Wikipedia
   const { bio, wikipediaUrl, isLoading: isBioLoading } = useArtistBio({
-    artistName: artist.name,
+    artistName: effectiveFocusedArtist.name,
   });
+
+  // Use focused artist data for timeline/sidebar, fall back to root artist data
+  const timelineSourceData = focusedData || data;
 
   // Build map of related artists for timeline
   const relatedArtistsMap = useMemo(() => {
-    if (!data) return new Map<string, ArtistNode>();
-    return new Map(data.relatedArtists.map(a => [a.id, a]));
-  }, [data]);
+    if (!timelineSourceData) return new Map<string, ArtistNode>();
+    return new Map(timelineSourceData.relatedArtists.map(a => [a.id, a]));
+  }, [timelineSourceData]);
 
-  // Timeline data
+  // Timeline data for the focused artist
   const {
     events: timelineEvents,
     isLoading: isTimelineLoading,
     yearRange,
   } = useArtistTimeline({
-    artist: data?.artist || null,
-    relationships: data?.relationships || [],
+    artist: timelineSourceData?.artist || effectiveFocusedArtist,
+    relationships: timelineSourceData?.relationships || [],
     relatedArtists: relatedArtistsMap,
   });
 
@@ -329,6 +352,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
                 onNodeClick={handleNodeClick}
                 onNodeExpand={handleNodeExpand}
                 onNodeHover={setHoveredArtistId}
+                onFocusArtist={setFocusedArtist}
                 selectedNodeId={selectedNodeId}
                 hoveredNodeId={hoveredArtistId}
                 layoutType={layoutType}
