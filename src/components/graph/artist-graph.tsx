@@ -297,6 +297,7 @@ export function ArtistGraph({
     nodeType: 'person' | 'group';
     isHidden: boolean;
     isPinned: boolean;
+    isLoaded: boolean;
   } | null>(null);
   const [hiddenNodes, setHiddenNodes] = useState<Set<string>>(new Set());
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
@@ -920,6 +921,7 @@ export function ArtistGraph({
         nodeType: nodeData.type as 'person' | 'group',
         isHidden: hiddenNodes.has(nodeData.id),
         isPinned: node.locked(),
+        isLoaded: nodeData.loaded === 'true',
       });
     });
 
@@ -1293,7 +1295,7 @@ export function ArtistGraph({
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-lg shadow-sm text-xs text-gray-600">
         <p>Click node to select • Double-click to expand</p>
         <p>Drag nodes to reposition • Others react in real-time</p>
-        <p>Right-click to hide • Scroll to zoom</p>
+        <p>Right-click for options • Scroll to zoom</p>
       </div>
 
       {/* Layout indicator */}
@@ -1359,6 +1361,22 @@ export function ArtistGraph({
           <div className="px-3 py-1.5 text-xs text-gray-500 border-b">
             {contextMenu.nodeName}
           </div>
+          {/* Expand connections option - only for unexpanded nodes */}
+          {!contextMenu.isLoaded && (
+            <button
+              onClick={() => {
+                if (onNodeExpandRef.current) {
+                  onNodeExpandRef.current(contextMenu.nodeId);
+                }
+                setContextMenu(null);
+              }}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600 font-medium"
+            >
+              <span>🔗</span>
+              <span>Expand connections</span>
+            </button>
+          )}
+          {!contextMenu.isLoaded && <div className="border-t my-1" />}
           {/* Pin/Unpin option */}
           <button
             onClick={() => {
