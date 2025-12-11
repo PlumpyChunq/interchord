@@ -84,6 +84,7 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     expandProgress,
     expansionDepth,
     availableRelTypes,
+    supplementaryFounders,
     handleDepthChange,
     handleNodeExpand,
     handleResetGraph,
@@ -379,7 +380,8 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
                   relationshipGroups={groupRelationshipsByType(
                     data.relationships,
                     data.relatedArtists,
-                    data.artist.activeYears?.begin
+                    data.artist.activeYears?.begin,
+                    supplementaryFounders
                   )}
                   graphFilters={graphFilters}
                   selectedNodeId={selectedNodeId}

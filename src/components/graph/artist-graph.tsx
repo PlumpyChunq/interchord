@@ -137,7 +137,8 @@ const cytoscapeStyle = [
       'overlay-opacity': 0.1,
     },
   },
-  // Root/center node - MUCH larger and prominent
+  // Root/center node - MUCH larger and prominent with cyan glow
+  // This is the "searched artist" - the focus of the current view
   {
     selector: 'node[root = "true"]',
     style: {
@@ -145,9 +146,13 @@ const cytoscapeStyle = [
       'height': 80,
       'font-size': 14,
       'font-weight': 700,
-      'border-width': 5,
-      'border-color': '#1f2937',
+      'border-width': 6,
+      'border-color': '#06b6d4',
       'background-color': '#2563eb',
+      // Cyan glow effect to indicate "this is the searched artist"
+      'overlay-color': '#06b6d4',
+      'overlay-opacity': 0.15,
+      'overlay-padding': 8,
     },
   },
   // Not yet expanded nodes
@@ -1267,6 +1272,10 @@ export function ArtistGraph({
       {/* Legend */}
       <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur p-3 rounded-lg shadow-sm text-xs space-y-1 max-h-[calc(100%-6rem)] overflow-y-auto">
         <div className="font-semibold mb-2">Legend</div>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500 border-[3px] border-cyan-400 shadow-[0_0_0_3px_rgba(6,182,212,0.2)]" />
+          <span>Searched Artist</span>
+        </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full bg-blue-500" />
           <span>Band/Group</span>

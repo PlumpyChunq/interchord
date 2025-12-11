@@ -117,6 +117,7 @@ export interface UseGraphExpansionResult {
   expandProgress: { current: number; total: number } | null;
   expansionDepth: ExpansionDepth;
   availableRelTypes: string[];
+  supplementaryFounders: Set<string> | undefined;
   handleDepthChange: (depth: ExpansionDepth) => void;
   handleNodeExpand: (nodeId: string) => Promise<void>;
   handleResetGraph: () => void;
@@ -170,7 +171,35 @@ export function useGraphExpansion(
   }, [initialData, supplementaryFounders]);
 
   // Use expanded graph if available, otherwise initial
-  const graphData = expandedGraph || initialGraphData;
+  // Then apply supplementary founding member data as post-processing
+  const graphData = useMemo(() => {
+    const baseGraph = expandedGraph || initialGraphData;
+
+    // If no supplement data, return as-is
+    if (!supplementaryFounders || supplementaryFounders.size === 0) {
+      return baseGraph;
+    }
+
+    // Apply founding member status to nodes that match supplement MBIDs
+    // This handles the case where supplement data arrives AFTER the graph was built
+    return {
+      ...baseGraph,
+      nodes: baseGraph.nodes.map(node => {
+        const isSupplementaryFounder = supplementaryFounders.has(node.data.id);
+        // Only update if this node should be a founder but isn't marked yet
+        if (isSupplementaryFounder && !node.data.founding) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              founding: true,
+            },
+          };
+        }
+        return node;
+      }),
+    };
+  }, [expandedGraph, initialGraphData, supplementaryFounders]);
 
   // Compute available relationship types from current graph edges
   const availableRelTypes = useMemo(() => {
@@ -323,6 +352,7 @@ export function useGraphExpansion(
     expandProgress,
     expansionDepth,
     availableRelTypes,
+    supplementaryFounders: supplementaryFounders ?? undefined,
     handleDepthChange,
     handleNodeExpand,
     handleResetGraph,

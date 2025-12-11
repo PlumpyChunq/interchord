@@ -158,15 +158,20 @@ export function buildGraphData(
         loaded: true,
       },
     },
-    ...relatedArtists.map(a => ({
-      data: {
-        ...a,
-        loaded: false,
-        // Check both: relationship-based founding status AND supplementary Wikipedia data
-        founding: foundingMap.get(a.id) || supplementaryFounders?.has(a.id) || false,
-        instruments: instrumentsMap.get(a.id),
-      },
-    })),
+    ...relatedArtists.map(a => {
+      const isSupplementaryFounder = supplementaryFounders?.has(a.id) || false;
+      const isRelationshipFounder = foundingMap.get(a.id) || false;
+
+      return {
+        data: {
+          ...a,
+          loaded: false,
+          // Check both: relationship-based founding status AND supplementary Wikipedia data
+          founding: isRelationshipFounder || isSupplementaryFounder,
+          instruments: instrumentsMap.get(a.id),
+        },
+      };
+    }),
   ];
 
   // Enrich edges with fallback period from related artist's activeYears
