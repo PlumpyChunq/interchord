@@ -1,8 +1,68 @@
 # InterChord - Project Progress
 
-> Last Updated: 2025-12-10
+> Last Updated: 2025-12-12
 
 ## Current Status: **Phase 3 - Extended Discovery (In Progress)**
+
+---
+
+## Feature Checklist
+
+### Music Discovery & Search
+- [x] Artist search with MusicBrainz
+- [x] Predictive search with autocomplete (Solr-powered)
+- [x] Song/recording search (Solr index)
+- [x] Album/release search (Solr index)
+- [ ] Global search across all types (title, artist, band, year combined)
+- [ ] Identify original song and original performer (cover → original work)
+- [ ] View original artist profile from cover version
+- [ ] Hover over result to refocus main search context
+- [ ] Discovery queue (add songs/artists/bands/years for later exploration)
+- [ ] Shazam/audio recognition integration (if API available)
+
+### Artist & Relationship Graph
+- [x] Artist profiles with biographical data
+- [x] Band member relationships (member of, founder)
+- [x] Family & relationship links (spouses, children via Wikidata)
+- [x] Interactive map showing birthplaces, death locations, residences
+- [x] Timeline view for artist history (albums with cover art)
+- [ ] Tour locations / shows on map
+- [ ] Label relationships (artists → labels they created/own)
+- [ ] Producer networks
+- [ ] Sample genealogy (who sampled whom)
+- [ ] "6 degrees of separation" pathfinding
+- [ ] Member tenure visualization on timeline
+
+### Playback & Collection
+- [x] Spotify integration (import top/followed artists)
+- [x] Apple Music integration (import library artists)
+- [ ] Music playback integration (Apple Music/Spotify)
+- [ ] Purchase albums (link to stores)
+- [ ] Song lists / saved tracks
+- [ ] User-created playlists
+- [ ] Playlist sync with streaming services
+
+### User Accounts & Data
+- [x] Favorites system (localStorage)
+- [x] Genre categorization for favorites
+- [ ] User database (PostgreSQL)
+- [ ] Account creation and login
+- [ ] Cross-device sync
+- [ ] Backup and recovery of user data
+- [ ] Concert memories (tickets, photos, notes)
+- [ ] Encryption for sensitive user data
+
+### Infrastructure
+- [x] MusicBrainz database mirror (stonefrog-db01)
+- [x] Solr search indexes (15 collections)
+- [x] Hourly DB replication
+- [x] Podman containerization
+- [x] Cloudflare tunnel for HTTPS
+- [ ] Live Solr indexing (RabbitMQ + SIR)
+- [ ] User database backup and recovery
+- [ ] Monitoring and alerting
+- [ ] Growth/scaling planning
+- [ ] Cloud migration planning (beyond Vercel)
 
 ---
 
