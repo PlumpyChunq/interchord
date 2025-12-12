@@ -6,6 +6,8 @@
  *
  * Uses local PostgreSQL database when available, falls back to MusicBrainz API.
  * Returns source indicator for UI display.
+ *
+ * Rate limited: 100 requests per minute per IP
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,12 +16,24 @@ import {
   getArtistRelationships,
   getArtistLifeSpan,
 } from '@/lib/musicbrainz/data-source';
+import { apiLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 interface RouteParams {
   params: Promise<{ mbid: string }>;
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  const rateLimit = apiLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const { mbid } = await params;
   const searchParams = request.nextUrl.searchParams;
   const include = searchParams.get('include');

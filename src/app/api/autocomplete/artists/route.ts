@@ -5,11 +5,14 @@
  *
  * Fast autocomplete using Solr for type-ahead suggestions.
  * Falls back to PostgreSQL if Solr is unavailable.
+ *
+ * Rate limited: 100 requests per minute per IP (higher limit for autocomplete)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { autocompleteArtists, testSolrConnection } from '@/lib/musicbrainz/solr-client';
 import { searchArtists } from '@/lib/musicbrainz/data-source';
+import { apiLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 // Cache Solr availability status
 let solrAvailable: boolean | null = null;
@@ -33,6 +36,17 @@ async function isSolrAvailable(): Promise<boolean> {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limiting (higher limit for autocomplete since it's used for typing)
+  const clientIp = getClientIp(request);
+  const rateLimit = apiLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', results: [], artists: [] },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
   const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 25);

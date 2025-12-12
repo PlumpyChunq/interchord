@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 const LASTFM_API_KEY = process.env.NEXT_PUBLIC_LASTFM_API_KEY;
 const LASTFM_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  const rateLimit = apiLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const method = searchParams.get('method');
   const artist = searchParams.get('artist');

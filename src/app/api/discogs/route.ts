@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 const DISCOGS_TOKEN = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
 const DISCOGS_BASE_URL = 'https://api.discogs.com';
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  const rateLimit = apiLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 

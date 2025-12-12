@@ -5,11 +5,14 @@
  *
  * Uses Solr for fast text search when available, falls back to PostgreSQL,
  * then to MusicBrainz API. Returns source indicator for UI display.
+ *
+ * Rate limited: 30 requests per minute per IP
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { searchArtistsSolr, testSolrConnection } from '@/lib/musicbrainz/solr-client';
 import { searchArtists } from '@/lib/musicbrainz/data-source';
+import { searchLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 // Cache Solr availability status
 let solrAvailable: boolean | null = null;
@@ -33,6 +36,17 @@ async function isSolrAvailable(): Promise<boolean> {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  const rateLimit = searchLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
   const limit = parseInt(searchParams.get('limit') || '10', 10);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
 const SETLIST_FM_BASE_URL = 'https://api.setlist.fm/rest/1.0';
 const API_KEY = process.env.SETLIST_FM_API_KEY;
@@ -39,6 +40,17 @@ interface SetlistFmResponse {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  const rateLimit = apiLimiter.check(clientIp);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const artistName = searchParams.get('artist');
   const artistMbid = searchParams.get('mbid');
