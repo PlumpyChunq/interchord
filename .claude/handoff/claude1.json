@@ -1,15 +1,15 @@
 {
   "from": "claude1",
   "location": "mac",
-  "timestamp": "2025-12-12T19:30:00Z",
-  "sequence": 68,
+  "timestamp": "2025-12-12T20:15:00Z",
+  "sequence": 69,
   "status": "DEPLOY_REQUEST",
-  "task": "Deploy Solr XML parsing fix for album/recording search",
-  "message": "Fixed critical bug: Album, Song, and other non-artist searches were showing empty results because MusicBrainz Solr stores data as XML in _store field, not as individual fields. Added XML parsing to extract entity data properly.",
+  "task": "Deploy Solr XML parsing + Genre enrichment fix",
+  "message": "Two fixes: (1) Album/Song searches now work - MusicBrainz Solr stores data as XML in _store field, added parsing. (2) Genre enrichment - favorites now get genres from PostgreSQL tags when viewing artist detail. All favorites will update from 'Other' category to proper genres.",
   "needs_response": true,
   "priority": "HIGH",
   "action_required": {
-    "task": "Pull and rebuild to test entity searches",
+    "task": "Pull and rebuild to test both fixes",
     "commands": [
       "cd ~/interchord && git pull origin main",
       "podman-compose down",
@@ -19,25 +19,25 @@
     "verification": [
       "curl -s http://localhost:3000/api/musicbrainz/health | jq .",
       "curl -s 'http://localhost:3000/api/autocomplete?q=Locus&type=release&limit=3' | jq '.results[:2]'",
-      "curl -s 'http://localhost:3000/api/autocomplete?q=Yesterday&type=recording&limit=3' | jq '.results[:2]'",
-      "curl -s 'http://localhost:3000/api/autocomplete?q=Sub%20Pop&type=label&limit=3' | jq '.results[:2]'"
+      "curl -s 'http://localhost:3000/api/autocomplete?q=Yesterday&type=recording&limit=3' | jq '.results[:2]'"
     ]
   },
   "context": {
     "key_files": [
-      "src/lib/musicbrainz/solr-client.ts - XML parsing for _store field"
+      "src/lib/musicbrainz/solr-client.ts - XML parsing for _store field",
+      "src/lib/musicbrainz/db-client.ts - Tag/genre fetching from PostgreSQL",
+      "src/lib/favorites/utils.ts - enrichFavoriteGenres() function",
+      "src/components/artist-detail.tsx - Calls enrichFavoriteGenres on load"
     ],
     "changes_summary": [
-      "MusicBrainz Solr (except artist) stores data as XML in _store field, not individual fields",
-      "Added parseReleaseXml(), parseRecordingXml(), etc. to extract data from XML",
-      "Updated getReturnFields() to request mbid,_store for non-artist types",
-      "Updated mapSolrDocToEntity() to use XML parsing",
-      "Removed old unused mapping functions"
+      "Solr XML parsing: parseReleaseXml(), parseRecordingXml(), etc.",
+      "DB client: getArtistTagsFromDB(), mapTagsToGenres(), GENRE_CATEGORIES",
+      "getArtistFromDB() now returns genres from MusicBrainz tags",
+      "Artist detail view enriches favorites with genres when loaded"
     ],
     "fixes_issues": [
-      "Album search showing icons but no titles",
-      "Recording search results empty",
-      "All non-artist entity type searches broken"
+      "Album/Song search showing icons but no titles",
+      "Favorites all grouped in 'Other' category instead of proper genres"
     ],
     "prerequisites": [],
     "warnings": []
@@ -46,5 +46,5 @@
     "required_vars": [],
     "required_tools": ["podman", "podman-compose"]
   },
-  "notes": "SPOTIFY REDIRECT ISSUE: When testing Spotify OAuth locally, use http://127.0.0.1:3000 instead of http://localhost:3000."
+  "notes": "SPOTIFY REDIRECT ISSUE: When testing Spotify OAuth locally, use http://127.0.0.1:3000 instead of http://localhost:3000. Genre enrichment happens when user views artist detail - favorites added via autocomplete will be enriched when clicked."
 }
