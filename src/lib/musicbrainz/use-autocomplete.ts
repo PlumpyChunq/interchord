@@ -1,22 +1,56 @@
 /**
- * Artist Autocomplete Hook
+ * Autocomplete Hook
  *
- * Provides debounced autocomplete functionality for artist search.
+ * Provides debounced autocomplete functionality for MusicBrainz entity search.
  * Queries the server-side API which uses Solr for fast results.
+ * Supports multiple entity types: artist, recording, release, work, label, place, event.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { ArtistNode } from '@/types';
+import type { SearchEntityType } from '@/types';
+
+// Generic result type - all MusicBrainz entities have at least these fields
+export interface AutocompleteSuggestion {
+  id: string;
+  name: string;
+  type?: string;
+  disambiguation?: string;
+  // Artist-specific
+  country?: string;
+  activeYears?: { begin?: string; end?: string | null };
+  // Recording-specific
+  artistCredit?: string;
+  releaseTitle?: string;
+  duration?: number;
+  isrc?: string;
+  // Release-specific
+  date?: string;
+  labelName?: string;
+  // Work-specific
+  iswc?: string;
+  recordingCount?: number;
+  // Label-specific
+  foundedYear?: number;
+  // Place-specific
+  area?: string;
+  address?: string;
+  // Event-specific
+  place?: string;
+}
 
 interface AutocompleteResult {
-  suggestions: ArtistNode[];
+  suggestions: AutocompleteSuggestion[];
   isLoading: boolean;
   error: string | null;
   source: 'solr' | 'postgres' | 'api' | 'none';
   latencyMs: number | null;
+  entityType: SearchEntityType;
+  entityTypeLabel: string;
 }
 
 interface UseAutocompleteOptions {
+  /** Entity type to search (default: 'artist') */
+  entityType?: SearchEntityType;
   /** Minimum characters before searching (default: 2) */
   minChars?: number;
   /** Debounce delay in ms (default: 300) */
@@ -26,11 +60,24 @@ interface UseAutocompleteOptions {
   /** Callback when autocomplete starts */
   onSearchStart?: () => void;
   /** Callback when autocomplete completes */
-  onSearchComplete?: (results: ArtistNode[]) => void;
+  onSearchComplete?: (results: AutocompleteSuggestion[]) => void;
 }
 
+// Entity type labels for display
+const ENTITY_TYPE_LABELS: Record<SearchEntityType, string> = {
+  artist: 'Artists',
+  recording: 'Songs',
+  release: 'Albums',
+  'release-group': 'Album Groups',
+  work: 'Compositions',
+  label: 'Labels',
+  place: 'Places',
+  area: 'Areas',
+  event: 'Events',
+};
+
 /**
- * Hook for debounced artist autocomplete
+ * Hook for debounced autocomplete across MusicBrainz entity types
  *
  * @param query - Current search input value
  * @param options - Configuration options
@@ -39,13 +86,13 @@ interface UseAutocompleteOptions {
  * @example
  * ```tsx
  * const [inputValue, setInputValue] = useState('');
- * const { suggestions, isLoading } = useAutocomplete(inputValue);
+ * const { suggestions, isLoading } = useAutocomplete(inputValue, { entityType: 'recording' });
  *
  * return (
  *   <div>
  *     <input value={inputValue} onChange={e => setInputValue(e.target.value)} />
- *     {suggestions.map(artist => (
- *       <div key={artist.id}>{artist.name}</div>
+ *     {suggestions.map(result => (
+ *       <div key={result.id}>{result.name}</div>
  *     ))}
  *   </div>
  * );
@@ -54,8 +101,9 @@ interface UseAutocompleteOptions {
 export function useAutocomplete(
   query: string,
   options: UseAutocompleteOptions = {}
-): AutocompleteResult {
+): AutocompleteResult & { clearSuggestions: () => void } {
   const {
+    entityType = 'artist',
     minChars = 2,
     debounceMs = 300,
     limit = 8,
@@ -63,18 +111,20 @@ export function useAutocomplete(
     onSearchComplete,
   } = options;
 
-  const [suggestions, setSuggestions] = useState<ArtistNode[]>([]);
+  const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<'solr' | 'postgres' | 'api' | 'none'>('none');
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
-  // Track the latest query to handle race conditions
+  // Track the latest query and entity type to handle race conditions
   const latestQueryRef = useRef(query);
+  const latestEntityTypeRef = useRef(entityType);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     latestQueryRef.current = query;
+    latestEntityTypeRef.current = entityType;
 
     // Clear suggestions if query is too short
     if (!query || query.length < minChars) {
@@ -94,7 +144,7 @@ export function useAutocomplete(
     // Start loading after debounce
     const timeoutId = setTimeout(async () => {
       // Double-check query hasn't changed during debounce
-      if (query !== latestQueryRef.current) return;
+      if (query !== latestQueryRef.current || entityType !== latestEntityTypeRef.current) return;
 
       setIsLoading(true);
       setError(null);
@@ -105,15 +155,17 @@ export function useAutocomplete(
       try {
         const params = new URLSearchParams({
           q: query,
+          type: entityType,
           limit: String(limit),
         });
 
-        const response = await fetch(`/api/autocomplete/artists?${params}`, {
+        // Use unified autocomplete endpoint
+        const response = await fetch(`/api/autocomplete?${params}`, {
           signal: abortControllerRef.current.signal,
         });
 
         // Check if query changed while waiting
-        if (query !== latestQueryRef.current) return;
+        if (query !== latestQueryRef.current || entityType !== latestEntityTypeRef.current) return;
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
@@ -122,13 +174,13 @@ export function useAutocomplete(
         const data = await response.json();
 
         // Final check before updating state
-        if (query !== latestQueryRef.current) return;
+        if (query !== latestQueryRef.current || entityType !== latestEntityTypeRef.current) return;
 
-        setSuggestions(data.artists || []);
+        setSuggestions(data.results || []);
         setSource(data.source || 'none');
         setLatencyMs(data.latencyMs || null);
-        setError(null);
-        onSearchComplete?.(data.artists || []);
+        setError(data.error || null);
+        onSearchComplete?.(data.results || []);
       } catch (err) {
         // Ignore abort errors
         if (err instanceof Error && err.name === 'AbortError') {
@@ -136,12 +188,12 @@ export function useAutocomplete(
         }
 
         // Only update error if query hasn't changed
-        if (query === latestQueryRef.current) {
+        if (query === latestQueryRef.current && entityType === latestEntityTypeRef.current) {
           setError(err instanceof Error ? err.message : 'Autocomplete failed');
           setSuggestions([]);
         }
       } finally {
-        if (query === latestQueryRef.current) {
+        if (query === latestQueryRef.current && entityType === latestEntityTypeRef.current) {
           setIsLoading(false);
         }
       }
@@ -153,7 +205,7 @@ export function useAutocomplete(
         abortControllerRef.current.abort();
       }
     };
-  }, [query, minChars, debounceMs, limit, onSearchStart, onSearchComplete]);
+  }, [query, entityType, minChars, debounceMs, limit, onSearchStart, onSearchComplete]);
 
   // Clear suggestions manually (useful when selecting)
   const clearSuggestions = useCallback(() => {
@@ -168,6 +220,8 @@ export function useAutocomplete(
     error,
     source,
     latencyMs,
+    entityType,
+    entityTypeLabel: ENTITY_TYPE_LABELS[entityType] || entityType,
     clearSuggestions,
-  } as AutocompleteResult & { clearSuggestions: () => void };
+  };
 }

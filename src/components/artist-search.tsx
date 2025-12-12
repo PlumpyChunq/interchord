@@ -1,30 +1,115 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { ChevronDown, User, Music, Disc, Building2, MapPin, Calendar, FileMusic } from 'lucide-react';
 import { useArtistSearch } from '@/lib/musicbrainz/hooks';
 import { Button } from '@/components/ui/button';
 import { AutocompleteInput } from '@/components/autocomplete-input';
 import { FavoritesByGenre } from '@/components/favorites-by-genre';
 import { FAVORITES_KEY, type StoredArtist } from '@/lib/favorites';
-import type { ArtistNode } from '@/types';
+import type { AutocompleteSuggestion } from '@/lib/musicbrainz/use-autocomplete';
+import type { ArtistNode, SearchEntityType, RecordingNode, ReleaseNode, WorkNode, LabelNode, PlaceNode, EventNode } from '@/types';
+import { cn } from '@/lib/utils';
 
 // localStorage keys for this component
 const RECENT_SEARCHES_KEY = 'interchord-recent-searches';
 const MAX_RECENT_SEARCHES = 5;
 
+// Entity type configuration
+interface EntityTypeConfig {
+  label: string;
+  placeholder: string;
+  icon: React.ElementType;
+}
+
+const ENTITY_TYPES: Record<SearchEntityType, EntityTypeConfig> = {
+  artist: {
+    label: 'Artists',
+    placeholder: 'Search for an artist (e.g., Butthole Surfers)',
+    icon: User,
+  },
+  recording: {
+    label: 'Songs',
+    placeholder: 'Search for a song (e.g., Yesterday)',
+    icon: Music,
+  },
+  release: {
+    label: 'Albums',
+    placeholder: 'Search for an album (e.g., Abbey Road)',
+    icon: Disc,
+  },
+  'release-group': {
+    label: 'Album Groups',
+    placeholder: 'Search for album groups',
+    icon: Disc,
+  },
+  work: {
+    label: 'Compositions',
+    placeholder: 'Search by song title to find who wrote it',
+    icon: FileMusic,
+  },
+  label: {
+    label: 'Labels',
+    placeholder: 'Search for a record label (e.g., Sub Pop)',
+    icon: Building2,
+  },
+  place: {
+    label: 'Places',
+    placeholder: 'Search for a venue or studio',
+    icon: MapPin,
+  },
+  area: {
+    label: 'Areas',
+    placeholder: 'Search for a city, region, or country',
+    icon: Disc,
+  },
+  event: {
+    label: 'Events',
+    placeholder: 'Search for a concert or festival',
+    icon: Calendar,
+  },
+};
+
+// Entity types to show in dropdown (excluding less commonly used ones)
+const VISIBLE_ENTITY_TYPES: SearchEntityType[] = [
+  'artist',
+  'recording',
+  'release',
+  'work',
+  'label',
+  'place',
+  'event',
+];
+
+// Selected entity type (for non-artist results)
+export type SelectedEntity =
+  | { type: 'recording'; data: RecordingNode }
+  | { type: 'release'; data: ReleaseNode }
+  | { type: 'work'; data: WorkNode }
+  | { type: 'label'; data: LabelNode }
+  | { type: 'place'; data: PlaceNode }
+  | { type: 'event'; data: EventNode };
+
 interface ArtistSearchProps {
   onSelectArtist: (artist: ArtistNode) => void;
+  onSelectEntity?: (entity: SelectedEntity) => void;
 }
 
 const INITIAL_RESULTS_DISPLAY = 5;
 
-export function ArtistSearch({ onSelectArtist }: ArtistSearchProps) {
+export function ArtistSearch({ onSelectArtist, onSelectEntity }: ArtistSearchProps) {
+  const [entityType, setEntityType] = useState<SearchEntityType>('artist');
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<StoredArtist[]>([]);
   const [favorites, setFavorites] = useState<StoredArtist[]>([]);
   const [showAllResults, setShowAllResults] = useState(false);
 
-  const { data: results, error } = useArtistSearch(searchQuery);
+  // Only do full search for artists (for now)
+  const { data: results, error } = useArtistSearch(entityType === 'artist' ? searchQuery : '');
+
+  const currentConfig = ENTITY_TYPES[entityType];
+  const Icon = currentConfig.icon;
 
   // Track query for show-all reset
   const [lastQueryForShowAll, setLastQueryForShowAll] = useState('');
@@ -139,14 +224,44 @@ export function ArtistSearch({ onSelectArtist }: ArtistSearchProps) {
     }
   }, []);
 
+  // Handle entity type change
+  const handleTypeChange = useCallback((newType: SearchEntityType) => {
+    setEntityType(newType);
+    setShowTypeSelector(false);
+    setSearchQuery(''); // Clear search when changing type
+  }, []);
+
   // Handle direct selection from autocomplete dropdown
   const handleAutocompleteSelect = useCallback(
-    (artist: ArtistNode) => {
-      saveRecentSearch(artist);
-      setSearchQuery(''); // Clear search results when selecting from autocomplete
-      onSelectArtist(artist);
+    (result: AutocompleteSuggestion) => {
+      if (entityType === 'artist') {
+        // For artists, convert to ArtistNode and use artist callback
+        const artist: ArtistNode = {
+          id: result.id,
+          name: result.name,
+          type: (result.type as 'person' | 'group') || 'group',
+          loaded: false,
+          country: result.country,
+          disambiguation: result.disambiguation,
+          activeYears: result.activeYears,
+        };
+        saveRecentSearch(artist);
+        setSearchQuery(''); // Clear search results when selecting from autocomplete
+        onSelectArtist(artist);
+      } else {
+        // For other entity types, use the entity callback
+        setSearchQuery('');
+        if (onSelectEntity) {
+          // Map the autocomplete result to the appropriate entity type
+          const entity: SelectedEntity = {
+            type: entityType as Exclude<SearchEntityType, 'artist' | 'release-group' | 'area'>,
+            data: result as RecordingNode | ReleaseNode | WorkNode | LabelNode | PlaceNode | EventNode,
+          };
+          onSelectEntity(entity);
+        }
+      }
     },
-    [saveRecentSearch, onSelectArtist]
+    [entityType, saveRecentSearch, onSelectArtist, onSelectEntity]
   );
 
   // Handle selection from search results list
@@ -204,28 +319,82 @@ export function ArtistSearch({ onSelectArtist }: ArtistSearchProps) {
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
-      {/* Autocomplete Search Input */}
-      <AutocompleteInput
-        placeholder="Search for an artist (e.g., Butthole Surfers)"
-        onSelect={handleAutocompleteSelect}
-        onSearch={handleSearch}
-        autoFocus
-      />
+      {/* Search Input with Entity Type Selector */}
+      <div className="flex gap-2">
+        {/* Entity Type Selector */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowTypeSelector(!showTypeSelector)}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-lg border bg-background',
+              'hover:bg-accent transition-colors h-10',
+              'text-sm font-medium min-w-[110px] justify-between'
+            )}
+          >
+            <span className="flex items-center gap-2">
+              <Icon className="h-4 w-4" />
+              {currentConfig.label}
+            </span>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', showTypeSelector && 'rotate-180')} />
+          </button>
 
-      {/* Search Results - appear first when there's a search */}
-      {error && (
+          {/* Type Dropdown */}
+          {showTypeSelector && (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 z-40" onClick={() => setShowTypeSelector(false)} />
+              <div className="absolute top-full left-0 mt-1 w-40 bg-background border rounded-lg shadow-lg z-50">
+                {VISIBLE_ENTITY_TYPES.map((type) => {
+                  const config = ENTITY_TYPES[type];
+                  const TypeIcon = config.icon;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => handleTypeChange(type)}
+                      className={cn(
+                        'flex items-center gap-2 w-full px-3 py-2 text-left text-sm',
+                        'hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg',
+                        type === entityType && 'bg-accent/50'
+                      )}
+                    >
+                      <TypeIcon className="h-4 w-4" />
+                      {config.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Autocomplete Search Input */}
+        <div className="flex-1">
+          <AutocompleteInput
+            placeholder={currentConfig.placeholder}
+            entityType={entityType}
+            onSelect={handleAutocompleteSelect}
+            onSearch={handleSearch}
+            autoFocus
+          />
+        </div>
+      </div>
+
+      {/* Search Results - only show for artist searches */}
+      {entityType === 'artist' && error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           Error: {error.message}
         </div>
       )}
 
-      {results && results.length === 0 && searchQuery && (
+      {entityType === 'artist' && results && results.length === 0 && searchQuery && (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
           No artists found for &quot;{searchQuery}&quot;
         </div>
       )}
 
-      {results && results.length > 0 && (() => {
+      {entityType === 'artist' && results && results.length > 0 && (() => {
         const displayedResults = effectiveShowAllResults
           ? results
           : results.slice(0, INITIAL_RESULTS_DISPLAY);

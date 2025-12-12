@@ -20,6 +20,7 @@ import {
   autocompleteEntities,
   testSolrConnection,
 } from '@/lib/musicbrainz/solr-client';
+import { searchArtists } from '@/lib/musicbrainz/data-source';
 import type { SearchEntityType } from '@/types';
 
 // Valid entity types
@@ -114,12 +115,27 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For artists, we can use the existing fallback in the artist-specific route
-    // Redirect to the artist autocomplete endpoint
-    const artistUrl = new URL('/api/autocomplete/artists', request.url);
-    artistUrl.searchParams.set('q', query);
-    artistUrl.searchParams.set('limit', String(limit));
-    return NextResponse.redirect(artistUrl);
+    // For artists, fall back to PostgreSQL/API search directly
+    try {
+      const result = await searchArtists(query, limit, 0);
+      return NextResponse.json({
+        results: result.data,
+        entityType,
+        entityTypeLabel: ENTITY_TYPE_LABELS[entityType] || entityType,
+        source: result.source === 'local' ? 'postgres' : 'api',
+        latencyMs: Date.now() - startTime,
+      });
+    } catch (fallbackError) {
+      console.error('[Autocomplete API] Artist fallback error:', fallbackError);
+      return NextResponse.json({
+        results: [],
+        entityType,
+        entityTypeLabel: ENTITY_TYPE_LABELS[entityType] || entityType,
+        source: 'error',
+        latencyMs: Date.now() - startTime,
+        error: 'Search failed',
+      });
+    }
   }
 
   // Search with Solr
@@ -137,12 +153,20 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(`[Autocomplete API] ${entityType} search error:`, error);
 
-    // For artists, fall back to the artist-specific route
+    // For artists, fall back to PostgreSQL/API search
     if (entityType === 'artist') {
-      const artistUrl = new URL('/api/autocomplete/artists', request.url);
-      artistUrl.searchParams.set('q', query);
-      artistUrl.searchParams.set('limit', String(limit));
-      return NextResponse.redirect(artistUrl);
+      try {
+        const result = await searchArtists(query, limit, 0);
+        return NextResponse.json({
+          results: result.data,
+          entityType,
+          entityTypeLabel: ENTITY_TYPE_LABELS[entityType] || entityType,
+          source: result.source === 'local' ? 'postgres' : 'api',
+          latencyMs: Date.now() - startTime,
+        });
+      } catch (fallbackError) {
+        console.error('[Autocomplete API] Artist fallback error:', fallbackError);
+      }
     }
 
     return NextResponse.json(

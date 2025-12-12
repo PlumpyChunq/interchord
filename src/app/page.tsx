@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArtistSearch } from '@/components/artist-search';
+import { useState, useCallback } from 'react';
+import { ArtistSearch, type SelectedEntity as SearchSelectedEntity } from '@/components/artist-search';
 import { ArtistDetail } from '@/components/artist-detail';
 import { FavoritesRecentShows } from '@/components/favorites-recent-shows';
 import { SettingsDropdown } from '@/components/settings-dropdown';
@@ -201,6 +201,12 @@ export default function Home() {
     setSelectedEntity(null);
   };
 
+  // Handle non-artist entity selection from search
+  const handleSelectEntity = useCallback((entity: SearchSelectedEntity) => {
+    // Map the search entity type to page entity type
+    setSelectedEntity(entity as SelectedEntity);
+  }, []);
+
   // Is anything selected?
   const hasSelection = selectedArtist || selectedEntity;
 
@@ -251,8 +257,11 @@ export default function Home() {
           <EntityDetail entity={selectedEntity} onBack={handleBack} />
         ) : (
           <>
-            {/* Artist search with autocomplete and favorites */}
-            <ArtistSearch onSelectArtist={setSelectedArtist} />
+            {/* Search with autocomplete and favorites */}
+            <ArtistSearch
+              onSelectArtist={setSelectedArtist}
+              onSelectEntity={handleSelectEntity}
+            />
 
             {/* Show favorites recent shows on home page (after localStorage loads) */}
             {isLoaded && favoriteNames.length > 0 && (
