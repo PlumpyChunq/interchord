@@ -8,6 +8,13 @@ import dagre from 'cytoscape-dagre';
 import type { ArtistGraph as ArtistGraphType, ArtistNode, RelationshipType } from '@/types';
 import type { GraphFilterState } from './graph-filters';
 import { parseYear } from '@/lib/utils';
+import { getCytoscapeStyle } from './graph-styles';
+import {
+  type LayoutType,
+  getEffectiveLayout,
+  getLayoutOptions as getLayoutConfig,
+  calculateNodeDepths,
+} from './graph-layout';
 
 // Format tenure as years only (e.g., "1987–1994" or "2000–present")
 function formatTenure(begin?: string, end?: string | null): string {
@@ -34,8 +41,8 @@ const VIEWPORT_OUTER_THRESHOLD = 0.6;
 /** How much to pan toward a selected node (percentage of distance) */
 const PAN_DISTANCE_FACTOR = 0.3;
 
-// Layout types available to users
-export type LayoutType = 'auto' | 'radial' | 'force' | 'hierarchical' | 'concentric' | 'spoke';
+// Re-export LayoutType for consumers of this component
+export type { LayoutType } from './graph-layout';
 
 /**
  * Z-INDEX LAYERING STRATEGY
@@ -71,221 +78,6 @@ interface ArtistGraphProps {
   filters?: GraphFilterState;
 }
 
-// Cytoscape stylesheet - returns theme-aware styles
-const getCytoscapeStyle = (isDark: boolean) => [
-  // Node base styles
-  {
-    selector: 'node',
-    style: {
-      'label': 'data(label)',
-      'text-valign': 'bottom',
-      'text-halign': 'center',
-      'text-margin-y': 8,
-      'font-size': 10,
-      'font-weight': 500,
-      'color': isDark ? '#e5e7eb' : '#374151',
-      'text-outline-color': isDark ? '#3d1515' : '#ffffff',
-      'text-outline-width': 2,
-      'background-color': '#6b7280',
-      'border-width': 2,
-      'border-color': isDark ? '#4b5563' : '#ffffff',
-      'width': 35,
-      'height': 35,
-      'transition-property': 'background-color, border-color, width, height',
-      'transition-duration': 200,
-      'overlay-opacity': 0,
-      'text-wrap': 'wrap',
-      'text-max-width': 100,
-    },
-  },
-  // Group nodes (bands) - larger
-  {
-    selector: 'node[type = "group"]',
-    style: {
-      'background-color': '#3b82f6',
-      'width': 50,
-      'height': 50,
-      'font-size': 12,
-      'font-weight': 600,
-    },
-  },
-  // Person nodes
-  {
-    selector: 'node[type = "person"]',
-    style: {
-      'background-color': '#10b981',
-      'width': 35,
-      'height': 35,
-    },
-  },
-  // Selected node
-  {
-    selector: 'node:selected',
-    style: {
-      'border-color': '#ef4444',
-      'border-width': 4,
-      'background-color': '#fef2f2',
-    },
-  },
-  // Highlighted neighbor nodes (connected to selected)
-  {
-    selector: 'node.highlighted',
-    style: {
-      'border-color': '#f97316',
-      'border-width': 3,
-      'background-opacity': 1,
-    },
-  },
-  // Dimmed nodes (not selected or connected)
-  {
-    selector: 'node.dimmed',
-    style: {
-      'opacity': 0.3,
-    },
-  },
-  // Grabbed/dragging node
-  {
-    selector: 'node:grabbed',
-    style: {
-      'border-color': '#6366f1',
-      'border-width': 4,
-      'overlay-opacity': 0.1,
-    },
-  },
-  // Root/center node - MUCH larger and prominent with cyan glow
-  // This is the "searched artist" - the focus of the current view
-  {
-    selector: 'node[root = "true"]',
-    style: {
-      'width': 80,
-      'height': 80,
-      'font-size': 14,
-      'font-weight': 700,
-      'border-width': 6,
-      'border-color': '#06b6d4',
-      'background-color': '#2563eb',
-      // Cyan glow effect to indicate "this is the searched artist"
-      'overlay-color': '#06b6d4',
-      'overlay-opacity': 0.15,
-      'overlay-padding': 8,
-    },
-  },
-  // Not yet expanded nodes
-  {
-    selector: 'node[loaded = "false"]',
-    style: {
-      'background-opacity': 0.7,
-      'border-style': 'dashed',
-    },
-  },
-  // Founding members - purple border (solid)
-  // Must come AFTER loaded="false" to override the dashed border
-  {
-    selector: 'node[founding = "true"]',
-    style: {
-      'border-color': '#8b5cf6',
-      'border-width': 4,
-      'border-style': 'solid',
-    },
-  },
-  // Hovered node (from sidebar hover) - yellow ring like timeline highlights
-  // Must come AFTER loaded="false" to override the dashed border
-  {
-    selector: 'node.hovered',
-    style: {
-      'border-color': '#eab308',
-      'border-width': 4,
-      'border-style': 'solid',
-      'z-index': 1000,
-      'transition-property': 'border-color, border-width',
-      'transition-duration': 300,
-    },
-  },
-  // Edge base styles
-  {
-    selector: 'edge',
-    style: {
-      'width': 1.5,
-      'line-color': isDark ? '#4b5563' : '#d1d5db',
-      'target-arrow-color': isDark ? '#4b5563' : '#d1d5db',
-      'target-arrow-shape': 'triangle',
-      'arrow-scale': 0.8,
-      'curve-style': 'bezier',
-      'opacity': 0.6,
-      'label': '',  // No label by default
-      'font-size': 9,
-      'text-background-color': isDark ? '#1f2937' : '#ffffff',
-      'text-background-opacity': 0.9,
-      'text-background-padding': 2,
-    },
-  },
-  // Edge colors by type
-  {
-    selector: 'edge[type = "member_of"]',
-    style: {
-      'line-color': '#93c5fd',
-      'target-arrow-color': '#93c5fd',
-    },
-  },
-  {
-    selector: 'edge[type = "founder_of"]',
-    style: {
-      'line-color': '#fcd34d',
-      'target-arrow-color': '#fcd34d',
-      'width': 2,
-    },
-  },
-  {
-    selector: 'edge[type = "collaboration"]',
-    style: {
-      'line-color': '#6ee7b7',
-      'target-arrow-color': '#6ee7b7',
-      'line-style': 'dashed',
-    },
-  },
-  {
-    selector: 'edge[type = "producer"]',
-    style: {
-      'line-color': '#c4b5fd',
-      'target-arrow-color': '#c4b5fd',
-    },
-  },
-  {
-    selector: 'edge[type = "side_project"]',
-    style: {
-      'line-color': '#f9a8d4',
-      'target-arrow-color': '#f9a8d4',
-      'line-style': 'dashed',
-    },
-  },
-  // Highlighted edges (connected to selected node) - MUST come after type-specific styles
-  {
-    selector: 'edge.highlighted',
-    style: {
-      'width': 4,
-      'opacity': 1,
-      'line-color': '#ef4444',
-      'target-arrow-color': '#ef4444',
-      'z-index': 999,
-      'label': 'data(tenure)',
-      'font-size': 10,
-      'font-weight': 600,
-      'color': isDark ? '#e5e7eb' : '#374151',
-      'text-background-color': isDark ? '#1f2937' : '#ffffff',
-      'text-background-opacity': 0.95,
-      'text-background-padding': 3,
-      'text-background-shape': 'roundrectangle',
-      'text-margin-y': -10,
-    },
-  },
-  // Dimmed edges (not connected to selected)
-  {
-    selector: 'edge.dimmed',
-    style: {
-      'opacity': 0.15,
-    },
-  },
-];
 
 export function ArtistGraph({
   graph,
@@ -358,17 +150,6 @@ export function ArtistGraph({
   const resumeSimulationRef = useRef<() => void>(() => {});
   const resetInactivityTimerRef = useRef<() => void>(() => {});
 
-  // Layout display names for the dropdown (kept for potential future UI)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const layoutOptions: { value: LayoutType; label: string }[] = [
-    { value: 'auto', label: 'Auto (Depth-based)' },
-    { value: 'spoke', label: 'Spoke (Hub & Rings)' },
-    { value: 'radial', label: 'Radial Tree' },
-    { value: 'force', label: 'Force-Directed' },
-    { value: 'hierarchical', label: 'Hierarchical' },
-    { value: 'concentric', label: 'Concentric Rings' },
-  ];
-
   // Convert our graph format to Cytoscape elements
   const convertToElements = useCallback(() => {
     const nodes = graph.nodes.map((node, index) => {
@@ -398,243 +179,18 @@ export function ArtistGraph({
     return [...nodes, ...edges];
   }, [graph]);
 
-  // Calculate BFS depth from root node for each node
-  const calculateNodeDepths = useCallback((cy: Core): Map<string, number> => {
-    const depths = new Map<string, number>();
-    const rootNode = cy.$('node[root = "true"]').first();
-
-    if (!rootNode.length) return depths;
-
-    const rootId = rootNode.id();
-    depths.set(rootId, 0);
-
-    // BFS to calculate depths
-    const queue: string[] = [rootId];
-    const visited = new Set<string>([rootId]);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift();
-      if (!currentId) continue;
-      const currentDepth = depths.get(currentId) ?? 0;
-      const currentNode = cy.$(`#${currentId}`);
-
-      // Get all connected nodes (neighbors)
-      const neighbors = currentNode.neighborhood('node');
-      neighbors.forEach((neighbor) => {
-        const neighborId = neighbor.id();
-        if (!visited.has(neighborId)) {
-          visited.add(neighborId);
-          depths.set(neighborId, currentDepth + 1);
-          queue.push(neighborId);
-        }
-      });
-    }
-
-    return depths;
-  }, []);
-
-  // Determine effective layout based on 'auto' mode and network depth
-  const getEffectiveLayout = useCallback((layout: LayoutType, depth: number): Exclude<LayoutType, 'auto'> => {
-    if (layout !== 'auto') return layout;
-    // Auto mode: Force at depth 1, Spoke at depth 2+
-    return depth === 1 ? 'force' : 'spoke';
-  }, []);
-
   // Get layout options for the specified layout type
+  // Uses the extracted layout configuration from graph-layout.ts
   const getLayoutOptions = useCallback((nodeCount: number, cy?: Core, layout?: LayoutType): cytoscape.LayoutOptions => {
-    const isLarge = nodeCount > 100;
-    const isMedium = nodeCount > 30;
-    const effectiveLayout = getEffectiveLayout(layout || currentLayout, networkDepth);
-    const rootNode = cy?.$('node[root = "true"]').first();
-    const rootId = rootNode?.id();
-
-    switch (effectiveLayout) {
-      case 'force':
-        // Cola force-directed layout - LIVE physics simulation
-        // Nodes continuously react to each other when dragged
-        // Locked nodes (via node.lock()) are treated as immovable anchors
-        return {
-          name: 'cola',
-          animate: true,
-          infinite: true,  // KEY: Keeps simulation running forever
-          fit: false,  // Don't continuously fit - allows user zoom/pan
-          padding: 30,
-          // Node spacing - how far apart nodes try to stay
-          nodeSpacing: () => isLarge ? 20 : isMedium ? 30 : 40,
-          // Edge length - ideal distance between connected nodes
-          edgeLength: () => isLarge ? 100 : isMedium ? 150 : 200,
-          // Prevent node overlap
-          avoidOverlap: true,
-          // How much nodes repel each other (higher = more spread)
-          edgeSymDiffLength: isLarge ? 10 : 20,
-          // Alignment constraint strength
-          alignment: undefined,
-          // Flow direction (undefined = no constraint)
-          flow: undefined,
-          // Unconstraint iterations (initial spreading)
-          unconstrIter: isLarge ? 10 : 20,
-          // User constraint iterations
-          userConstIter: 0,
-          // All constraint iterations
-          allConstIter: isLarge ? 10 : 20,
-          // Randomize initial positions for better spreading
-          randomize: false,
-          // Center the graph
-          centerGraph: true,
-          // Handle disconnected components
-          handleDisconnected: true,
-        } as unknown as cytoscape.LayoutOptions;
-
-      case 'hierarchical':
-        // Dagre hierarchical layout - tree structure
-        return {
-          name: 'dagre',
-          fit: true,
-          padding: 30,
-          rankDir: 'TB', // Top to bottom
-          ranker: 'network-simplex',
-          nodeSep: isLarge ? 30 : isMedium ? 50 : 70,
-          rankSep: isLarge ? 50 : isMedium ? 80 : 100,
-          edgeSep: 10,
-          animate: true,
-          animationDuration: 500,
-          animationEasing: 'ease-out',
-        } as unknown as cytoscape.LayoutOptions;
-
-      case 'concentric':
-        // Concentric layout - rings based on degree
-        const depths = cy ? calculateNodeDepths(cy) : new Map<string, number>();
-        const maxDepth = Math.max(0, ...Array.from(depths.values()));
-        return {
-          name: 'concentric',
-          fit: true,
-          padding: 30,
-          startAngle: Math.PI * 3 / 2,
-          sweep: Math.PI * 2,
-          clockwise: true,
-          equidistant: false,
-          minNodeSpacing: isLarge ? 20 : isMedium ? 40 : 60,
-          avoidOverlap: true,
-          nodeDimensionsIncludeLabels: true,
-          animate: true,
-          animationDuration: 500,
-          concentric: (node: NodeSingular) => {
-            const nodeId = node.id();
-            const depth = depths.get(nodeId) ?? maxDepth;
-            return maxDepth - depth + 1;
-          },
-          levelWidth: () => 1,
-          spacingFactor: isLarge ? 0.4 : isMedium ? 0.5 : 0.6,
-        } as unknown as cytoscape.LayoutOptions;
-
-      case 'spoke': {
-        // Custom spoke layout - hub with explicit rings based on BFS depth
-        // This creates the visual pattern: Core -> Members -> Members' other bands
-        const spokeDepths = cy ? calculateNodeDepths(cy) : new Map<string, number>();
-
-        // Group nodes by depth
-        const nodesByDepth = new Map<number, string[]>();
-        spokeDepths.forEach((depth, nodeId) => {
-          const existing = nodesByDepth.get(depth);
-          if (existing) {
-            existing.push(nodeId);
-          } else {
-            nodesByDepth.set(depth, [nodeId]);
-          }
-        });
-
-        // Calculate positions for each node
-        const positions: Record<string, { x: number; y: number }> = {};
-        const containerWidth = containerRef.current?.clientWidth || 800;
-        const containerHeight = containerRef.current?.clientHeight || 600;
-        const centerX = containerWidth / 2;
-        const centerY = containerHeight / 2;
-
-        // Minimum spacing between nodes on a ring (accounts for node size + label)
-        const minNodeSpacing = isLarge ? 50 : isMedium ? 60 : 70;
-        // Minimum ring spacing
-        const minRingSpacing = isLarge ? 80 : isMedium ? 100 : 120;
-
-        // Calculate cumulative radius for each depth based on node counts
-        let cumulativeRadius = 0;
-        const ringRadii = new Map<number, number>();
-
-        // Sort depths and calculate radii
-        const sortedDepths = Array.from(nodesByDepth.keys()).sort((a, b) => a - b);
-
-        sortedDepths.forEach((depth) => {
-          if (depth === 0) {
-            ringRadii.set(depth, 0);
-          } else {
-            const nodesAtDepth = nodesByDepth.get(depth)?.length || 1;
-            // Calculate minimum radius needed to fit all nodes with proper spacing
-            // Circumference = 2 * PI * r, so r = (nodeCount * spacing) / (2 * PI)
-            const radiusForSpacing = (nodesAtDepth * minNodeSpacing) / (2 * Math.PI);
-            // Use whichever is larger: minimum ring spacing or spacing-based radius
-            const ringIncrement = Math.max(minRingSpacing, radiusForSpacing - cumulativeRadius + minRingSpacing);
-            cumulativeRadius += ringIncrement;
-            ringRadii.set(depth, cumulativeRadius);
-          }
-        });
-
-        nodesByDepth.forEach((nodeIds, depth) => {
-          if (depth === 0) {
-            // Center node (hub)
-            nodeIds.forEach(id => {
-              positions[id] = { x: centerX, y: centerY };
-            });
-          } else {
-            // Arrange nodes in a circle at this depth with calculated radius
-            const radius = ringRadii.get(depth) || depth * minRingSpacing;
-            const nodeCount = nodeIds.length;
-            const angleStep = (2 * Math.PI) / nodeCount;
-            const startAngle = -Math.PI / 2; // Start from top
-
-            nodeIds.forEach((id, index) => {
-              const angle = startAngle + (index * angleStep);
-              positions[id] = {
-                x: centerX + radius * Math.cos(angle),
-                y: centerY + radius * Math.sin(angle),
-              };
-            });
-          }
-        });
-
-        return {
-          name: 'preset',
-          positions: (node: NodeSingular) => {
-            const pos = positions[node.id()];
-            return pos || { x: centerX, y: centerY };
-          },
-          fit: true,
-          padding: 50,
-          animate: true,
-          animationDuration: 500,
-          animationEasing: 'ease-out',
-        } as unknown as cytoscape.LayoutOptions;
-      }
-
-      case 'radial':
-      default:
-        // Breadthfirst circle layout - spoke pattern
-        return {
-          name: 'breadthfirst',
-          fit: true,
-          directed: false,
-          padding: 30,
-          circle: true,
-          grid: false,
-          spacingFactor: isLarge ? 1.0 : isMedium ? 1.25 : 1.5,
-          avoidOverlap: true,
-          nodeDimensionsIncludeLabels: false,
-          roots: rootId ? `#${rootId}` : undefined,
-          animate: true,
-          animationDuration: 500,
-          animationEasing: 'ease-out',
-          maximal: false,
-        } as unknown as cytoscape.LayoutOptions;
-    }
-  }, [calculateNodeDepths, currentLayout, networkDepth, getEffectiveLayout]);
+    return getLayoutConfig({
+      nodeCount,
+      cy,
+      layout: layout || currentLayout,
+      networkDepth,
+      containerWidth: containerRef.current?.clientWidth || 800,
+      containerHeight: containerRef.current?.clientHeight || 600,
+    });
+  }, [currentLayout, networkDepth]);
 
   // Handle layout change from dropdown
   const handleLayoutChange = useCallback((newLayout: LayoutType) => {
