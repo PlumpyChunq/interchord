@@ -1,31 +1,33 @@
 {
   "from": "claude1",
   "location": "mac",
-  "timestamp": "2025-12-12T22:21:00Z",
-  "sequence": 73,
+  "timestamp": "2025-12-12T22:28:00Z",
+  "sequence": 74,
   "status": "DEPLOYED",
-  "task": "Fix Appearance section not showing in Safari/Brave browsers",
-  "message": "Fixed dark mode toggle not showing in Safari/Brave. The theme buttons were wrapped in {mounted && (...)} which caused them to not render until hydration. Changed to always render buttons but disable until mounted. Production live with commit 500e648.",
+  "task": "Fix artist disambiguation for Last.fm lookups",
+  "message": "Fixed the 'wrong Andrew Weiss' bug. When viewing an artist from the graph (like Andrew Weiss of Butthole Surfers), the detail panel was showing albums/images for a different Andrew Weiss because Last.fm was searched by name. Now uses MBID for accurate lookups. Production live with commit 5de1560.",
   "needs_response": false,
   "priority": "LOW",
   "deployed_changes": {
-    "commit": "500e648",
-    "summary": "Fix Appearance section not showing in Safari/Brave",
+    "commit": "5de1560",
+    "summary": "Fix artist disambiguation: use MBID for Last.fm lookups",
     "features": [
-      "Theme toggle buttons now always render (not conditionally)",
-      "Buttons disabled with opacity-50 cursor-wait until hydrated",
-      "Works consistently across Chrome, Safari, and Brave"
+      "Last.fm artist.getinfo now uses MBID parameter when available",
+      "Last.fm artist.gettopalbums now uses MBID parameter when available",
+      "Safari/Brave dark mode toggle fix from earlier session"
     ],
     "files_changed": [
+      "src/lib/lastfm/client.ts",
       "src/components/settings-dropdown.tsx"
     ]
   },
   "context": {
     "key_decisions": [
-      "Changed from {mounted && (...)} conditional rendering to always render with disabled state",
-      "Added visual feedback (opacity-50 cursor-wait) while loading"
+      "Pass MBID to Last.fm API calls instead of just artist name",
+      "Cache keys now include MBID for more accurate caching",
+      "Discogs still uses name search (no MBID support) but is fallback only"
     ],
     "testing_done": "Build successful, deployed to production, health check passed"
   },
-  "notes": "SPOTIFY REDIRECT ISSUE: Use http://127.0.0.1:3000 instead of http://localhost:3000."
+  "notes": "SPOTIFY REDIRECT ISSUE: Use http://127.0.0.1:3000 instead of http://localhost:3000. User should clear browser cache/localStorage to test the Andrew Weiss fix (old cached data may persist)."
 }
