@@ -44,5 +44,6 @@
   "environment": {
     "required_vars": [],
     "required_tools": ["podman", "podman-compose"]
-  }
+  },
+  "notes": "SPOTIFY REDIRECT ISSUE: When testing Spotify OAuth locally, you MUST use http://127.0.0.1:3000 instead of http://localhost:3000. Spotify's redirect URI validation treats 'localhost' and '127.0.0.1' as different hosts. The Spotify app is configured with 127.0.0.1 as the allowed redirect URI, so using localhost will fail with a redirect_uri_mismatch error. This only affects local development testing, not production (which uses https://interchord.stonefrog.com)."
 }
