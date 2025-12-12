@@ -49,17 +49,23 @@ async function fetchRelationshipsCached(mbid: string): Promise<RelationshipsData
 
   // Check localStorage cache first (instant)
   const cached = cacheGet<RelationshipsData>(cacheKey);
+  console.log('[hooks] fetchRelationshipsCached called for:', mbid);
+  console.log('[hooks] Cache result:', cached ? 'HIT' : 'MISS');
+
   if (cached) {
     // Check if cached data is missing genres (migration to new schema)
     // If so, refetch to get genres from updated API
     const hasGenres = cached.artist?.genres && cached.artist.genres.length > 0;
+    console.log('[hooks] Cached artist:', cached.artist?.name, 'hasGenres:', hasGenres, 'genres:', cached.artist?.genres);
     if (hasGenres) {
+      console.log('[hooks] Returning cached data with genres');
       return cached;
     }
     console.log('[hooks] Cache hit but missing genres, refetching:', mbid);
   }
 
   // Fetch via API route (uses local DB when available)
+  console.log('[hooks] Fetching from API...');
   const response = await fetch(`/api/musicbrainz/artist/${mbid}?include=relationships`);
 
   if (!response.ok) {
@@ -67,6 +73,7 @@ async function fetchRelationshipsCached(mbid: string): Promise<RelationshipsData
   }
 
   const data = await response.json();
+  console.log('[hooks] API response artist:', data.artist?.name, 'genres:', data.artist?.genres);
 
   const result: RelationshipsData = {
     artist: data.artist,
@@ -76,6 +83,7 @@ async function fetchRelationshipsCached(mbid: string): Promise<RelationshipsData
 
   // Cache for 1 week
   cacheSet(cacheKey, result, CacheTTL.LONG);
+  console.log('[hooks] Cached result with genres:', result.artist?.genres);
 
   return result;
 }

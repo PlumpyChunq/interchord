@@ -8,7 +8,7 @@
  * because callbacks become stale when the component unmounts.
  */
 
-import { searchArtists } from '@/lib/musicbrainz';
+import { searchArtists, getArtistById } from '@/lib/musicbrainz';
 import {
   STORAGE_KEYS,
   STORAGE_EVENTS,
@@ -250,13 +250,26 @@ class AppleMusicImportManager {
           if (mbResults.length > 0) {
             const mbArtist = mbResults[0];
 
+            // Fetch full artist data with genres from the artist API
+            // Search results don't include genres for performance, but we need them for import
+            let genres = mbArtist.genres;
+            try {
+              const fullArtist = await getArtistById(mbArtist.id);
+              if (fullArtist?.genres) {
+                genres = fullArtist.genres;
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch genres for ${artistName}:`, error);
+              // Continue with search result (genres will be undefined)
+            }
+
             // Create stored artist object
             const storedArtist: StoredArtist = {
               id: mbArtist.id,
               name: mbArtist.name,
               type: mbArtist.type,
               country: mbArtist.country,
-              genres: mbArtist.genres,
+              genres,
             };
 
             // Add directly to localStorage (survives component unmount!)
@@ -378,12 +391,24 @@ class AppleMusicImportManager {
 
           if (mbResults.length > 0) {
             const mbArtist = mbResults[0];
+
+            // Fetch full artist data with genres
+            let genres = mbArtist.genres;
+            try {
+              const fullArtist = await getArtistById(mbArtist.id);
+              if (fullArtist?.genres) {
+                genres = fullArtist.genres;
+              }
+            } catch {
+              // Continue with search result (genres will be undefined)
+            }
+
             const storedArtist: StoredArtist = {
               id: mbArtist.id,
               name: mbArtist.name,
               type: mbArtist.type,
               country: mbArtist.country,
-              genres: mbArtist.genres,
+              genres,
             };
 
             if (this.addFavoriteToStorage(storedArtist)) {

@@ -101,11 +101,19 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   // Enrich favorite with genres when artist data is loaded
   // This updates the stored favorite to include genre categories from MusicBrainz tags
   useEffect(() => {
+    console.log('[ArtistDetail] Enrichment effect triggered');
+    console.log('[ArtistDetail] data.artist:', data?.artist?.name, 'genres:', data?.artist?.genres);
+    console.log('[ArtistDetail] focusedData.artist:', focusedData?.artist?.name, 'genres:', focusedData?.artist?.genres);
+
     if (data?.artist?.genres && data.artist.genres.length > 0) {
+      console.log('[ArtistDetail] Calling enrichFavoriteGenres for data.artist:', data.artist.id);
       enrichFavoriteGenres(data.artist.id, data.artist.genres);
+    } else {
+      console.log('[ArtistDetail] data.artist has no genres, skipping enrichment');
     }
     // Also enrich focused artist if different from main artist
     if (focusedData?.artist?.genres && focusedData.artist.genres.length > 0) {
+      console.log('[ArtistDetail] Calling enrichFavoriteGenres for focusedData.artist:', focusedData.artist.id);
       enrichFavoriteGenres(focusedData.artist.id, focusedData.artist.genres);
     }
   }, [data?.artist?.id, data?.artist?.genres, focusedData?.artist?.id, focusedData?.artist?.genres]);

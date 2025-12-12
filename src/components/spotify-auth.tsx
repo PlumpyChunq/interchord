@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { Loader2, Check, Music2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSpotifyAuth, useSpotifyCallback, getCuratedTopArtists, getFollowedArtists } from '@/lib/spotify';
-import { searchArtists } from '@/lib/musicbrainz';
+import { searchArtists, getArtistById } from '@/lib/musicbrainz';
 import { SPOTIFY_CONFIG } from '@/lib/spotify/config';
 import {
   STORAGE_KEYS,
@@ -232,13 +232,24 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
           if (mbResults.length > 0) {
             const mbArtist = mbResults[0];
 
+            // Fetch full artist data with genres from the artist API
+            let genres = mbArtist.genres;
+            try {
+              const fullArtist = await getArtistById(mbArtist.id);
+              if (fullArtist?.genres) {
+                genres = fullArtist.genres;
+              }
+            } catch {
+              // Continue with search result (genres will be undefined)
+            }
+
             // Add directly to localStorage (works even if component unmounts)
             const wasAdded = addFavoriteToStorage({
               id: mbArtist.id,
               name: mbArtist.name,
               type: mbArtist.type,
               country: mbArtist.country,
-              genres: mbArtist.genres,
+              genres,
             });
 
             if (wasAdded) {
@@ -312,12 +323,24 @@ export function SpotifyAuth({ onImportComplete }: SpotifyAuthProps) {
           const mbResults = await searchArtists(spotifyArtist.name, 1);
           if (mbResults.length > 0) {
             const mbArtist = mbResults[0];
+
+            // Fetch full artist data with genres
+            let genres = mbArtist.genres;
+            try {
+              const fullArtist = await getArtistById(mbArtist.id);
+              if (fullArtist?.genres) {
+                genres = fullArtist.genres;
+              }
+            } catch {
+              // Continue with search result
+            }
+
             if (addFavoriteToStorage({
               id: mbArtist.id,
               name: mbArtist.name,
               type: mbArtist.type,
               country: mbArtist.country,
-              genres: mbArtist.genres,
+              genres,
             })) {
               imported++;
             }

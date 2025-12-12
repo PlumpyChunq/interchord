@@ -38,6 +38,8 @@ export type { DataSource, DataSourceResult } from './data-source';
 /**
  * Search artists via API route (uses local DB when available)
  * This is the PREFERRED method for client-side code
+ * Note: Search results do NOT include genres (for performance)
+ * Use getArtistById() to fetch full artist data with genres
  */
 export async function searchArtists(query: string, limit: number = 10): Promise<ArtistNode[]> {
   const response = await fetch(
@@ -50,4 +52,22 @@ export async function searchArtists(query: string, limit: number = 10): Promise<
 
   const data = await response.json();
   return data.artists || [];
+}
+
+/**
+ * Fetch a single artist by MBID with full data including genres
+ * Uses the artist API route which fetches from local DB with genres
+ */
+export async function getArtistById(mbid: string): Promise<ArtistNode | null> {
+  const response = await fetch(`/api/musicbrainz/artist/${encodeURIComponent(mbid)}`);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error(`Failed to fetch artist: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.artist || null;
 }

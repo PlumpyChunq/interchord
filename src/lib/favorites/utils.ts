@@ -79,23 +79,40 @@ export function getFavorites(): StoredArtist[] {
  * Only updates if the artist is in favorites AND doesn't have genres yet.
  */
 export function enrichFavoriteGenres(artistId: string, genres: string[] | undefined): void {
-  if (!genres || genres.length === 0) return;
+  console.log('[enrichFavoriteGenres] Called with artistId:', artistId, 'genres:', genres);
+
+  if (!genres || genres.length === 0) {
+    console.log('[enrichFavoriteGenres] No genres provided, skipping');
+    return;
+  }
 
   const favorites = getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []) ?? [];
   const index = favorites.findIndex((f) => f.id === artistId);
+  console.log('[enrichFavoriteGenres] Found at index:', index, 'total favorites:', favorites.length);
 
-  if (index === -1) return; // Not a favorite
+  if (index === -1) {
+    console.log('[enrichFavoriteGenres] Artist not in favorites, skipping');
+    return; // Not a favorite
+  }
 
   const favorite = favorites[index];
+  console.log('[enrichFavoriteGenres] Current favorite genres:', favorite.genres);
 
   // Only update if favorite doesn't have genres
-  if (favorite.genres && favorite.genres.length > 0) return;
+  if (favorite.genres && favorite.genres.length > 0) {
+    console.log('[enrichFavoriteGenres] Already has genres, skipping');
+    return;
+  }
 
   // Update the favorite with genres
   const updated = [...favorites];
   updated[index] = { ...favorite, genres };
 
+  console.log('[enrichFavoriteGenres] Updating favorite with genres:', genres);
   if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
+    console.log('[enrichFavoriteGenres] Successfully saved, dispatching event');
     dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED);
+  } else {
+    console.log('[enrichFavoriteGenres] Failed to save to storage');
   }
 }
