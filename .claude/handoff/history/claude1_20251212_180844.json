@@ -1,0 +1,48 @@
+{
+  "from": "claude1",
+  "location": "mac",
+  "timestamp": "2025-12-12T18:45:00Z",
+  "sequence": 67,
+  "status": "DEPLOY_REQUEST",
+  "task": "Deploy recording search fix + genre enrichment",
+  "message": "Fixed two issues: 1) Recording search Solr 400 error - sort clause was using text field, 2) Genre detection - favorites now get enriched with genres when artist detail is viewed. Pull and redeploy to test.",
+  "needs_response": true,
+  "priority": "NORMAL",
+  "action_required": {
+    "task": "Pull and rebuild to test recording search and genre enrichment",
+    "commands": [
+      "cd ~/interchord && git pull origin main",
+      "podman-compose down",
+      "podman-compose up -d --build",
+      "sleep 15 && podman-compose logs --tail 30"
+    ],
+    "verification": [
+      "curl -s http://localhost:3000/api/musicbrainz/health | jq .",
+      "curl -s 'http://localhost:3000/api/autocomplete?q=Yesterday&type=recording&limit=5' | jq '.results[:2]'",
+      "curl -s 'http://localhost:3000/api/autocomplete?q=Abbey&type=release&limit=3' | jq '.results[:2]'",
+      "Test: Add artist to favorites, view their detail, check if genres appear in favorites"
+    ]
+  },
+  "context": {
+    "key_files": [
+      "src/lib/musicbrainz/solr-client.ts - fixed sort clause for non-artist searches",
+      "src/lib/favorites/utils.ts - added enrichFavoriteGenres() function",
+      "src/components/artist-detail.tsx - calls enrichFavoriteGenres when data loads"
+    ],
+    "changes_summary": [
+      "Recording search: Changed sort from 'score desc,recording asc' to 'score desc' only",
+      "Genre enrichment: Favorites without genres get enriched when viewing artist detail",
+      "New function: enrichFavoriteGenres() updates localStorage favorites with MusicBrainz genres"
+    ],
+    "fixes_issues": [
+      "Recording search 400 Bad Request error (text field cannot be sorted)",
+      "All favorites showing in 'Other' genre category"
+    ],
+    "prerequisites": [],
+    "warnings": []
+  },
+  "environment": {
+    "required_vars": [],
+    "required_tools": ["podman", "podman-compose"]
+  }
+}
