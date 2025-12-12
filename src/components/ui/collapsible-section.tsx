@@ -116,22 +116,22 @@ export function CollapsibleSection({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex items-center gap-1.5 py-1 px-2 bg-gray-100 rounded border border-gray-200 cursor-grab active:cursor-grabbing select-none transition-all ${
-            isDragging ? 'opacity-40 scale-95' : 'hover:bg-gray-150'
+          className={`flex items-center gap-1.5 py-1 px-2 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing select-none transition-all ${
+            isDragging ? 'opacity-40 scale-95' : 'hover:bg-gray-150 dark:hover:bg-gray-700'
           }`}
         >
-          <GripVertical className="w-3 h-3 text-gray-400 flex-shrink-0" />
+          <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
           <button
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
             }}
-            className="flex items-center gap-1 flex-1 text-left hover:text-blue-600 transition-colors min-w-0"
+            className="flex items-center gap-1 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors min-w-0"
           >
-            <ChevronRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
-            <span className="text-xs font-medium text-gray-600 truncate">{title}</span>
+            <ChevronRight className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 truncate">{title}</span>
             {count !== undefined && (
-              <span className="text-[10px] text-gray-400 flex-shrink-0">({count})</span>
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">({count})</span>
             )}
           </button>
         </div>
@@ -162,19 +162,19 @@ export function CollapsibleSection({
           onDragEnd={handleDragEnd}
           className="flex items-center gap-1 py-1.5 px-2 cursor-grab active:cursor-grabbing select-none"
         >
-          <GripVertical className="w-3 h-3 text-gray-300 flex-shrink-0" />
+          <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 flex-shrink-0" />
 
           <button
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
             }}
-            className="flex items-center gap-1 flex-1 text-left hover:text-blue-600 transition-colors min-w-0"
+            className="flex items-center gap-1 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors min-w-0"
           >
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <span className="text-sm font-medium truncate">{title}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <span className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">{title}</span>
             {count !== undefined && (
-              <span className="text-xs font-normal text-gray-400 flex-shrink-0">({count})</span>
+              <span className="text-xs font-normal text-gray-400 dark:text-gray-500 flex-shrink-0">({count})</span>
             )}
           </button>
 
@@ -187,8 +187,8 @@ export function CollapsibleSection({
               disabled={!canMoveUp}
               className={`p-0.5 rounded transition-colors ${
                 canMoveUp
-                  ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                  : 'text-gray-200 cursor-not-allowed'
+                  ? 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'text-gray-200 dark:text-gray-700 cursor-not-allowed'
               }`}
               title="Move up"
             >
@@ -204,8 +204,8 @@ export function CollapsibleSection({
               disabled={!canMoveDown}
               className={`p-0.5 rounded transition-colors ${
                 canMoveDown
-                  ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                  : 'text-gray-200 cursor-not-allowed'
+                  ? 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'text-gray-200 dark:text-gray-700 cursor-not-allowed'
               }`}
               title="Move down"
             >
