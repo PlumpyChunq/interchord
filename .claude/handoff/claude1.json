@@ -1,33 +1,33 @@
 {
   "from": "claude1",
   "location": "mac",
-  "timestamp": "2025-12-12T22:28:00Z",
-  "sequence": 74,
+  "timestamp": "2025-12-12T22:32:00Z",
+  "sequence": 75,
   "status": "DEPLOYED",
-  "task": "Fix artist disambiguation for Last.fm lookups",
-  "message": "Fixed the 'wrong Andrew Weiss' bug. When viewing an artist from the graph (like Andrew Weiss of Butthole Surfers), the detail panel was showing albums/images for a different Andrew Weiss because Last.fm was searched by name. Now uses MBID for accurate lookups. Production live with commit 5de1560.",
+  "task": "Fix native app links opening in browser",
+  "message": "Fixed 'Open in native app' setting not working for album links. Links were using target='_blank' unconditionally and not passing useNativeApp to URL generation. Now albums open in Apple Music/Spotify app when setting is enabled. Production live with commit df84420.",
   "needs_response": false,
   "priority": "LOW",
   "deployed_changes": {
-    "commit": "5de1560",
-    "summary": "Fix artist disambiguation: use MBID for Last.fm lookups",
+    "commit": "df84420",
+    "summary": "Fix native app links opening in browser instead of app",
     "features": [
-      "Last.fm artist.getinfo now uses MBID parameter when available",
-      "Last.fm artist.gettopalbums now uses MBID parameter when available",
-      "Safari/Brave dark mode toggle fix from earlier session"
+      "Album links now respect 'Open in native app' setting",
+      "target='_blank' only applied for web URLs, not app URLs (music://, spotify://)",
+      "Fixed in both sidebar album grid and timeline popup"
     ],
     "files_changed": [
-      "src/lib/lastfm/client.ts",
-      "src/components/settings-dropdown.tsx"
+      "src/components/sidebar-sections.tsx",
+      "src/components/timeline/timeline-event-popup.tsx"
     ]
   },
   "context": {
     "key_decisions": [
-      "Pass MBID to Last.fm API calls instead of just artist name",
-      "Cache keys now include MBID for more accurate caching",
-      "Discogs still uses name search (no MBID support) but is fallback only"
+      "Pass useNativeApp parameter to getAlbumUrl() for correct URL scheme",
+      "Use spread syntax to conditionally apply target='_blank'",
+      "Keep target='_blank' for web URLs to prevent navigation away from app"
     ],
     "testing_done": "Build successful, deployed to production, health check passed"
   },
-  "notes": "SPOTIFY REDIRECT ISSUE: Use http://127.0.0.1:3000 instead of http://localhost:3000. User should clear browser cache/localStorage to test the Andrew Weiss fix (old cached data may persist)."
+  "notes": "SPOTIFY REDIRECT ISSUE: Use http://127.0.0.1:3000 instead of http://localhost:3000."
 }
