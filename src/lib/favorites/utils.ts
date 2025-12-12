@@ -72,3 +72,30 @@ export function isFavorite(artistId: string): boolean {
 export function getFavorites(): StoredArtist[] {
   return getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []) ?? [];
 }
+
+/**
+ * Enrich a favorite artist with genres if they don't have any.
+ * This is called when artist detail is loaded (which fetches tags from MusicBrainz).
+ * Only updates if the artist is in favorites AND doesn't have genres yet.
+ */
+export function enrichFavoriteGenres(artistId: string, genres: string[] | undefined): void {
+  if (!genres || genres.length === 0) return;
+
+  const favorites = getStorageItem<StoredArtist[]>(STORAGE_KEYS.FAVORITES, []) ?? [];
+  const index = favorites.findIndex((f) => f.id === artistId);
+
+  if (index === -1) return; // Not a favorite
+
+  const favorite = favorites[index];
+
+  // Only update if favorite doesn't have genres or has an overrideGenre
+  if (favorite.genres && favorite.genres.length > 0) return;
+
+  // Update the favorite with genres
+  const updated = [...favorites];
+  updated[index] = { ...favorite, genres };
+
+  if (setStorageItem(STORAGE_KEYS.FAVORITES, updated)) {
+    dispatchStorageEvent(STORAGE_EVENTS.FAVORITES_UPDATED);
+  }
+}

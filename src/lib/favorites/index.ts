@@ -8,4 +8,5 @@ export {
   removeFromFavorites,
   isFavorite,
   getFavorites,
+  enrichFavoriteGenres,
 } from './utils';

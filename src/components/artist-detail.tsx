@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useArtistRelationships } from '@/lib/musicbrainz/hooks';
 import { useEnrichedArtist } from '@/lib/apple-music';
 import { Button } from '@/components/ui/button';
 import { GraphView, LayoutType, GraphFilters, getDefaultFilters, type GraphFilterState } from '@/components/graph';
-import { addToFavorites, removeFromFavorites, isFavorite } from '@/lib/favorites';
+import { addToFavorites, removeFromFavorites, isFavorite, enrichFavoriteGenres } from '@/lib/favorites';
 import { SidebarSections } from '@/components/sidebar-sections';
 import type { ArtistNode } from '@/types';
 import { useArtistTimeline } from '@/lib/timeline';
@@ -90,6 +90,18 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     handleResetGraph,
     hasExpandedGraph,
   } = useGraphExpansion(artist.id, data);
+
+  // Enrich favorite with genres when artist data is loaded
+  // This updates the stored favorite to include genre categories from MusicBrainz tags
+  useEffect(() => {
+    if (data?.artist?.genres && data.artist.genres.length > 0) {
+      enrichFavoriteGenres(data.artist.id, data.artist.genres);
+    }
+    // Also enrich focused artist if different from main artist
+    if (focusedData?.artist?.genres && focusedData.artist.genres.length > 0) {
+      enrichFavoriteGenres(focusedData.artist.id, focusedData.artist.genres);
+    }
+  }, [data?.artist?.id, data?.artist?.genres, focusedData?.artist?.id, focusedData?.artist?.genres]);
 
   // Enrich focused artist with Apple Music data (image, albums)
   const { data: enrichedArtist } = useEnrichedArtist(effectiveFocusedArtist);

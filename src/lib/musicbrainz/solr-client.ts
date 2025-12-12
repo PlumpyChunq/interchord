@@ -617,12 +617,17 @@ export async function autocompleteEntities<T extends SearchEntityType>(
     `${nameField}:*${escapedQuery}*^10`, // Contains match
   ].join(' OR ');
 
+  // Note: Only artist collection has sortable name field
+  // Other collections use text fields that can't be sorted directly
+  // So we just sort by score (relevance) for non-artist searches
+  const sortClause = entityType === 'artist' ? 'score desc,name asc' : 'score desc';
+
   const params = new URLSearchParams({
     q: solrQuery,
     wt: 'json',
     rows: String(limit),
     fl: fields,
-    sort: `score desc,${nameField} asc`,
+    sort: sortClause,
   });
 
   const url = `${SOLR_URL}/${collection}/select?${params}`;
@@ -686,13 +691,16 @@ export async function searchEntities<T extends SearchEntityType>(
     `${nameField}:*${escapedQuery}*^10`, // Contains match
   ].join(' OR ');
 
+  // Note: Only artist collection has sortable name field
+  const sortClause = entityType === 'artist' ? 'score desc,name asc' : 'score desc';
+
   const params = new URLSearchParams({
     q: solrQuery,
     wt: 'json',
     rows: String(limit),
     start: String(offset),
     fl: fields,
-    sort: `score desc,${nameField} asc`,
+    sort: sortClause,
   });
 
   const url = `${SOLR_URL}/${collection}/select?${params}`;
