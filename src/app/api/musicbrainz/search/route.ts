@@ -3,12 +3,34 @@
  *
  * GET /api/musicbrainz/search?q=artist_name&limit=10&offset=0
  *
- * Uses local PostgreSQL database when available, falls back to MusicBrainz API.
- * Returns source indicator for UI display.
+ * Uses Solr for fast text search when available, falls back to PostgreSQL,
+ * then to MusicBrainz API. Returns source indicator for UI display.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { searchArtistsSolr, testSolrConnection } from '@/lib/musicbrainz/solr-client';
 import { searchArtists } from '@/lib/musicbrainz/data-source';
+
+// Cache Solr availability status
+let solrAvailable: boolean | null = null;
+let lastSolrCheck = 0;
+const SOLR_CHECK_INTERVAL_MS = 30000;
+
+async function isSolrAvailable(): Promise<boolean> {
+  const now = Date.now();
+  if (solrAvailable !== null && now - lastSolrCheck < SOLR_CHECK_INTERVAL_MS) {
+    return solrAvailable;
+  }
+
+  solrAvailable = await testSolrConnection();
+  lastSolrCheck = now;
+
+  if (!solrAvailable) {
+    console.warn('[Search] Solr unavailable, will use DB fallback');
+  }
+
+  return solrAvailable;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -23,7 +45,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const startTime = Date.now();
+
   try {
+    // Try Solr first (optimized for text search, much faster than ILIKE)
+    if (await isSolrAvailable()) {
+      try {
+        const { artists, total } = await searchArtistsSolr(query, limit, offset);
+        return NextResponse.json({
+          artists,
+          total,
+          source: 'solr',
+          latencyMs: Date.now() - startTime,
+        });
+      } catch (error) {
+        console.error('[Search] Solr failed, falling back to DB:', error);
+        solrAvailable = false;
+      }
+    }
+
+    // Fallback to PostgreSQL/API via data-source
     const result = await searchArtists(query, limit, offset);
 
     return NextResponse.json({
