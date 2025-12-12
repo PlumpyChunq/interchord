@@ -59,16 +59,6 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
     setIsFav(currentIsFav);
   }
 
-  const handleToggleFavorite = useCallback(() => {
-    if (isFav) {
-      removeFromFavorites(effectiveFocusedArtist.id);
-      setIsFav(false);
-    } else {
-      addToFavorites(effectiveFocusedArtist);
-      setIsFav(true);
-    }
-  }, [effectiveFocusedArtist, isFav]);
-
   // Graph data uses the original artist (root of the graph)
   const { data, isLoading, error } = useArtistRelationships(artist.id);
 
@@ -76,6 +66,23 @@ export function ArtistDetail({ artist, onBack, onSelectRelated }: ArtistDetailPr
   const { data: focusedData } = useArtistRelationships(
     effectiveFocusedArtist.id !== artist.id ? effectiveFocusedArtist.id : ''
   );
+
+  const handleToggleFavorite = useCallback(() => {
+    if (isFav) {
+      removeFromFavorites(effectiveFocusedArtist.id);
+      setIsFav(false);
+    } else {
+      // Get genres from fetched data (data.artist for root, focusedData.artist for focused)
+      const fetchedArtist = effectiveFocusedArtist.id === artist.id
+        ? data?.artist
+        : focusedData?.artist;
+      const genres = fetchedArtist?.genres || effectiveFocusedArtist.genres;
+
+      // Add to favorites with genres included
+      addToFavorites({ ...effectiveFocusedArtist, genres });
+      setIsFav(true);
+    }
+  }, [effectiveFocusedArtist, isFav, artist.id, data?.artist, focusedData?.artist]);
 
   // Graph expansion hook - manages all graph state
   const {

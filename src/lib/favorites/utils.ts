@@ -88,7 +88,7 @@ export function enrichFavoriteGenres(artistId: string, genres: string[] | undefi
 
   const favorite = favorites[index];
 
-  // Only update if favorite doesn't have genres or has an overrideGenre
+  // Only update if favorite doesn't have genres
   if (favorite.genres && favorite.genres.length > 0) return;
 
   // Update the favorite with genres

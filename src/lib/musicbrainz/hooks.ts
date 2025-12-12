@@ -42,6 +42,7 @@ interface RelationshipsData {
 
 /**
  * Fetch relationships via API route with localStorage caching
+ * Note: Cache is invalidated if artist data is missing genres (for migration)
  */
 async function fetchRelationshipsCached(mbid: string): Promise<RelationshipsData> {
   const cacheKey = `artist-relationships-${mbid}`;
@@ -49,7 +50,13 @@ async function fetchRelationshipsCached(mbid: string): Promise<RelationshipsData
   // Check localStorage cache first (instant)
   const cached = cacheGet<RelationshipsData>(cacheKey);
   if (cached) {
-    return cached;
+    // Check if cached data is missing genres (migration to new schema)
+    // If so, refetch to get genres from updated API
+    const hasGenres = cached.artist?.genres && cached.artist.genres.length > 0;
+    if (hasGenres) {
+      return cached;
+    }
+    console.log('[hooks] Cache hit but missing genres, refetching:', mbid);
   }
 
   // Fetch via API route (uses local DB when available)
@@ -88,14 +95,17 @@ export function useArtistSearch(query: string, enabled: boolean = true) {
 /**
  * Hook to get artist relationships with localStorage caching
  * Uses API route which leverages local DB when available
+ *
+ * Note: staleTime is 0 to ensure queryFn always runs, allowing localStorage
+ * cache to handle freshness and genre migration logic.
  */
 export function useArtistRelationships(mbid: string | null) {
   return useQuery({
     queryKey: ['artistRelationships', mbid],
     queryFn: () => fetchRelationshipsCached(mbid!),
     enabled: !!mbid,
-    staleTime: Infinity, // Don't refetch - localStorage cache handles freshness
-    gcTime: Infinity, // Keep in memory forever (localStorage is source of truth)
+    staleTime: 0, // Always call queryFn - localStorage cache handles freshness
+    gcTime: 5 * 60 * 1000, // Keep in memory for 5 minutes
   });
 }
 
