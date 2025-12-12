@@ -626,3 +626,4 @@ This documentation follows industry standards:
 | **SRE Runbooks** | Incident Response section with troubleshooting steps |
 - Always follow best practices
 - Use official documentation when possible
+- Remember to use http://127.0.0.1:3000 because of the Spotify redirect issue

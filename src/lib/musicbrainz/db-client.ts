@@ -179,7 +179,7 @@ function formatDate(year: number | null, month: number | null, day: number | nul
 /**
  * Map database artist row to ArtistNode
  */
-function mapDbArtistToNode(row: DbArtist): ArtistNode {
+function mapDbArtistToNode(row: DbArtist, genres?: string[]): ArtistNode {
   return {
     id: row.gid,
     name: row.name,
@@ -194,8 +194,80 @@ function mapDbArtistToNode(row: DbArtist): ArtistNode {
             : null,
         }
       : undefined,
+    genres,
     loaded: false,
   };
+}
+
+// ============================================================================
+// Genre Category Mapping (matching client.ts for consistency)
+// ============================================================================
+
+const GENRE_CATEGORIES: Record<string, string[]> = {
+  'Rock': ['rock', 'hard rock', 'alternative rock', 'indie rock', 'punk rock', 'post-punk', 'grunge', 'progressive rock', 'psychedelic rock', 'garage rock', 'classic rock', 'art rock', 'glam rock', 'southern rock', 'folk rock', 'roots rock', 'stoner rock'],
+  'Metal': ['metal', 'heavy metal', 'death metal', 'black metal', 'thrash metal', 'doom metal', 'power metal', 'metalcore', 'progressive metal', 'nu metal', 'symphonic metal', 'groove metal', 'sludge metal'],
+  'Pop': ['pop', 'synthpop', 'art pop', 'dance-pop', 'electropop', 'indie pop', 'dream pop', 'power pop', 'teen pop', 'k-pop', 'j-pop', 'europop', 'bubblegum pop'],
+  'Hip-Hop': ['hip hop', 'hip-hop', 'rap', 'trap', 'gangsta rap', 'conscious hip hop', 'boom bap', 'southern hip hop', 'west coast hip hop', 'east coast hip hop', 'alternative hip hop', 'underground hip hop'],
+  'Electronic': ['electronic', 'edm', 'house', 'techno', 'trance', 'dubstep', 'drum and bass', 'ambient', 'idm', 'electro', 'synthwave', 'downtempo', 'breakbeat'],
+  'R&B': ['r&b', 'rhythm and blues', 'soul', 'neo-soul', 'motown', 'funk', 'disco', 'contemporary r&b', 'new jack swing'],
+  'Jazz': ['jazz', 'bebop', 'swing', 'fusion', 'smooth jazz', 'free jazz', 'cool jazz', 'acid jazz', 'latin jazz', 'avant-garde jazz'],
+  'Classical': ['classical', 'orchestral', 'opera', 'chamber music', 'baroque', 'romantic', 'contemporary classical', 'minimalist', 'neo-classical'],
+  'Country': ['country', 'country rock', 'bluegrass', 'americana', 'outlaw country', 'alt-country', 'country pop', 'honky tonk', 'western swing'],
+  'Folk': ['folk', 'folk rock', 'singer-songwriter', 'traditional folk', 'contemporary folk', 'indie folk', 'freak folk', 'anti-folk'],
+  'Punk': ['punk', 'punk rock', 'hardcore', 'post-hardcore', 'pop punk', 'emo', 'skate punk', 'anarcho-punk', 'crust punk', 'melodic hardcore'],
+  'Indie': ['indie', 'indie rock', 'indie pop', 'indie folk', 'lo-fi', 'shoegaze', 'post-rock', 'math rock', 'slowcore', 'noise pop'],
+  'World': ['world', 'latin', 'reggae', 'afrobeat', 'bossa nova', 'salsa', 'ska', 'dub', 'world music', 'african', 'celtic', 'flamenco', 'brazilian', 'cumbia', 'tropicalia', 'highlife'],
+  'Blues': ['blues', 'delta blues', 'chicago blues', 'electric blues', 'country blues', 'texas blues', 'jump blues'],
+  'Experimental': ['experimental', 'avant-garde', 'noise', 'industrial', 'krautrock', 'musique concrète', 'drone', 'dark ambient', 'power electronics'],
+};
+
+/**
+ * Map database tags to genre categories (same logic as client.ts)
+ */
+function mapTagsToGenres(tags: Array<{ name: string; count: number }> | undefined): string[] | undefined {
+  if (!tags || tags.length === 0) return undefined;
+
+  const categoryScores: Record<string, number> = {};
+  const sortedTags = [...tags].sort((a, b) => b.count - a.count);
+
+  for (const tag of sortedTags) {
+    const tagLower = tag.name.toLowerCase();
+    for (const [category, categoryTags] of Object.entries(GENRE_CATEGORIES)) {
+      if (categoryTags.some(ct => tagLower.includes(ct) || ct.includes(tagLower))) {
+        categoryScores[category] = (categoryScores[category] || 0) + tag.count;
+      }
+    }
+  }
+
+  const sortedCategories = Object.entries(categoryScores)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([category]) => category);
+
+  return sortedCategories.length > 0 ? sortedCategories : undefined;
+}
+
+/**
+ * Fetch tags for an artist from the database
+ */
+async function getArtistTagsFromDB(mbid: string): Promise<Array<{ name: string; count: number }>> {
+  const sql = `
+    SELECT t.name, at.count
+    FROM musicbrainz.artist_tag at
+    JOIN musicbrainz.tag t ON at.tag = t.id
+    JOIN musicbrainz.artist a ON at.artist = a.id
+    WHERE a.gid = $1::uuid
+    ORDER BY at.count DESC
+    LIMIT 20
+  `;
+
+  try {
+    const rows = await query<{ name: string; count: number }>(sql, [mbid]);
+    return rows;
+  } catch (error) {
+    console.error('[DB] Failed to fetch artist tags:', error);
+    return [];
+  }
 }
 
 /**
@@ -240,11 +312,11 @@ export async function searchArtistsFromDB(
     offset,
   ]);
 
-  return rows.map(mapDbArtistToNode);
+  return rows.map(row => mapDbArtistToNode(row));
 }
 
 /**
- * Get artist by MBID
+ * Get artist by MBID (with tags/genres)
  */
 export async function getArtistFromDB(mbid: string): Promise<ArtistNode | null> {
   const sql = `
@@ -270,7 +342,13 @@ export async function getArtistFromDB(mbid: string): Promise<ArtistNode | null> 
   `;
 
   const rows = await query<DbArtist>(sql, [mbid]);
-  return rows.length > 0 ? mapDbArtistToNode(rows[0]) : null;
+  if (rows.length === 0) return null;
+
+  // Fetch tags and map to genres
+  const tags = await getArtistTagsFromDB(mbid);
+  const genres = mapTagsToGenres(tags);
+
+  return mapDbArtistToNode(rows[0], genres);
 }
 
 /**
