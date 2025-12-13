@@ -213,7 +213,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className={`mx-auto py-3 ${hasSelection ? 'px-4' : 'container px-4'}`}>
-        <header className="flex items-center mb-4">
+        <header className="flex items-center mb-4 relative z-[1100]">
           <div className="w-48">
             {hasSelection && (
               <button

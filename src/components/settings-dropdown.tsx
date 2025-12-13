@@ -103,7 +103,7 @@ export function SettingsDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1200]">
           {/* Appearance Section */}
           <div className="p-3">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
