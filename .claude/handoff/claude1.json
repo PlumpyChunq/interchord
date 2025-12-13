@@ -1,67 +1,54 @@
 {
   "from": "claude1",
   "location": "mac",
-  "timestamp": "2025-12-13T20:10:00Z",
-  "sequence": 76,
+  "timestamp": "2025-12-13T22:15:00Z",
+  "sequence": 77,
   "status": "DEPLOY_REQUEST",
-  "task": "Deploy Gemini architectural improvements",
-  "message": "Please deploy latest changes (5 commits). Includes rate limiting, Solr search, graph module extraction, genre unification, and React key fix. Security audit passed - no critical issues.",
+  "task": "Check and restart MusicBrainz server",
+  "message": "MusicBrainz API on port 5000 is refusing connections. Native iOS app cannot connect to local database. Please check container status and restart if needed.",
   "needs_response": true,
   "priority": "HIGH",
-  "commits_to_deploy": [
-    "4394af4 Use Solr for /api/musicbrainz/search (faster than ILIKE)",
-    "5434d80 Add rate limiting to all public API routes",
-    "f558236 Extract graph styles and layout to separate modules",
-    "b52ccaa Unify genre mapping logic into shared utility",
-    "5bf390f Fix duplicate React key warning for relationships"
-  ],
-  "key_changes": {
-    "rate_limiting": {
-      "file": "src/lib/rate-limit.ts",
-      "description": "Sliding window rate limiter with 100/min (API), 30/min (search), 10/min (strict)",
-      "routes_protected": [
-        "/api/musicbrainz/search",
-        "/api/autocomplete/artists",
-        "/api/musicbrainz/artist/[mbid]",
-        "/api/concerts",
-        "/api/fanart",
-        "/api/lastfm",
-        "/api/discogs"
-      ]
-    },
-    "solr_integration": {
-      "file": "src/lib/musicbrainz/solr-client.ts",
-      "description": "Fast autocomplete and search via Solr, falls back to DB/API"
-    },
-    "graph_extraction": {
-      "files": [
-        "src/components/graph/graph-styles.ts",
-        "src/components/graph/graph-layout.ts"
-      ],
-      "description": "Extracted 500+ lines from artist-graph.tsx for maintainability"
-    },
-    "genre_unification": {
-      "file": "src/lib/genres/mapping.ts",
-      "description": "Shared genre mapping used by both client.ts and db-client.ts"
-    }
+  "action_required": {
+    "task": "Diagnose and fix MusicBrainz API availability",
+    "commands": [
+      "# Check container status",
+      "podman ps -a | grep musicbrainz",
+      "",
+      "# Check if port 5000 is listening",
+      "ss -tlnp | grep 5000",
+      "",
+      "# Check MusicBrainz logs for errors",
+      "cd ~/musicbrainz-docker && podman-compose logs --tail=50 musicbrainz",
+      "",
+      "# If containers are down, restart them",
+      "cd ~/musicbrainz-docker && podman-compose up -d",
+      "",
+      "# Wait for startup",
+      "sleep 10",
+      "",
+      "# Test API endpoint",
+      "curl -s 'http://localhost:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json' | head -c 200"
+    ],
+    "verification": [
+      "curl -s 'http://localhost:5000/ws/2/artist?query=beatles&fmt=json&limit=1' | jq -r '.artists[0].name'",
+      "# Should return: The Beatles"
+    ]
   },
-  "security_audit": {
-    "critical": 0,
-    "high": 0,
-    "medium": 1,
-    "low": 2,
-    "recommendation": "Safe to deploy"
+  "context": {
+    "key_files": [],
+    "prerequisites": [
+      "MusicBrainz docker-compose at ~/musicbrainz-docker",
+      "podman and podman-compose installed"
+    ],
+    "warnings": [
+      "MusicBrainz stack may take 1-2 minutes to fully start",
+      "Solr indexing may need time after restart"
+    ],
+    "rollback": []
   },
-  "deployment_steps": [
-    "git pull origin main",
-    "podman-compose down",
-    "podman-compose up -d --build",
-    "curl localhost:3000/api/musicbrainz/health"
-  ],
-  "verification_tests": [
-    "Health check returns 'local' source (DB connected)",
-    "Search returns results with 'solr' source",
-    "Rate limit headers present (X-RateLimit-Limit, X-RateLimit-Remaining)"
-  ],
-  "notes": "SPOTIFY REDIRECT ISSUE: Use http://127.0.0.1:3000 instead of http://localhost:3000."
+  "environment": {
+    "required_vars": [],
+    "required_tools": ["podman", "podman-compose", "curl"]
+  },
+  "notes": "Native InterChord iOS app needs local MusicBrainz API for fast searches without rate limits."
 }
