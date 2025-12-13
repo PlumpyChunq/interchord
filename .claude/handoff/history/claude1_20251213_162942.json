@@ -1,0 +1,54 @@
+{
+  "from": "claude1",
+  "location": "mac",
+  "timestamp": "2025-12-13T22:15:00Z",
+  "sequence": 77,
+  "status": "DEPLOY_REQUEST",
+  "task": "Check and restart MusicBrainz server",
+  "message": "MusicBrainz API on port 5000 is refusing connections. Native iOS app cannot connect to local database. Please check container status and restart if needed.",
+  "needs_response": true,
+  "priority": "HIGH",
+  "action_required": {
+    "task": "Diagnose and fix MusicBrainz API availability",
+    "commands": [
+      "# Check container status",
+      "podman ps -a | grep musicbrainz",
+      "",
+      "# Check if port 5000 is listening",
+      "ss -tlnp | grep 5000",
+      "",
+      "# Check MusicBrainz logs for errors",
+      "cd ~/musicbrainz-docker && podman-compose logs --tail=50 musicbrainz",
+      "",
+      "# If containers are down, restart them",
+      "cd ~/musicbrainz-docker && podman-compose up -d",
+      "",
+      "# Wait for startup",
+      "sleep 10",
+      "",
+      "# Test API endpoint",
+      "curl -s 'http://localhost:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json' | head -c 200"
+    ],
+    "verification": [
+      "curl -s 'http://localhost:5000/ws/2/artist?query=beatles&fmt=json&limit=1' | jq -r '.artists[0].name'",
+      "# Should return: The Beatles"
+    ]
+  },
+  "context": {
+    "key_files": [],
+    "prerequisites": [
+      "MusicBrainz docker-compose at ~/musicbrainz-docker",
+      "podman and podman-compose installed"
+    ],
+    "warnings": [
+      "MusicBrainz stack may take 1-2 minutes to fully start",
+      "Solr indexing may need time after restart"
+    ],
+    "rollback": []
+  },
+  "environment": {
+    "required_vars": [],
+    "required_tools": ["podman", "podman-compose", "curl"]
+  },
+  "notes": "Native InterChord iOS app needs local MusicBrainz API for fast searches without rate limits."
+}
