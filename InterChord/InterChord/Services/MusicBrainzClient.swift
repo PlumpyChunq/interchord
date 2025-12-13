@@ -43,8 +43,9 @@ actor MusicBrainzClient {
 
     // MARK: - Configuration
 
-    /// Private server URL (stonefrog-db01 via Cloudflare tunnel)
-    private let privateServerURL = URL(string: "https://interchord.stonefrog.com/api/musicbrainz")!
+    /// Private server URL (stonefrog-db01 via hostname - best practice over IP)
+    /// Port 5000 is the MusicBrainz API container
+    private let privateServerURL = URL(string: "http://stonefrog-db01.stonefrog.com:5000/ws/2")!
 
     /// Public MusicBrainz API URL
     private let publicAPIURL = URL(string: "https://musicbrainz.org/ws/2")!
@@ -88,15 +89,15 @@ actor MusicBrainzClient {
 
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
 
-        // Try private server first
-        if await checkPrivateServerReachability() {
-            do {
-                let artists = try await searchFromPrivateServer(query: encodedQuery)
-                lastDataSource = .privateServer
-                return artists
-            } catch {
-                // Fall through to public API
-            }
+        // Try private server first (skip reachability check, just try it)
+        do {
+            let artists = try await searchFromPrivateServer(query: encodedQuery)
+            lastDataSource = .privateServer
+            isPrivateServerReachable = true
+            return artists
+        } catch {
+            // Private server failed, mark as unreachable and fall back
+            isPrivateServerReachable = false
         }
 
         // Fall back to public API with rate limiting
@@ -109,8 +110,8 @@ actor MusicBrainzClient {
     /// - Parameter mbid: MusicBrainz ID
     /// - Returns: Artist with full details
     func fetchArtist(mbid: String) async throws -> Artist {
-        // Try private server first
-        if await checkPrivateServerReachability() {
+        // Try private server first (use cached reachability if available)
+        if isPrivateServerReachable ?? true {
             do {
                 let artist = try await fetchArtistFromPrivateServer(mbid: mbid)
                 lastDataSource = .privateServer
@@ -130,8 +131,8 @@ actor MusicBrainzClient {
     /// - Parameter mbid: MusicBrainz ID
     /// - Returns: Array of relationships
     func fetchRelationships(mbid: String) async throws -> [Relationship] {
-        // Try private server first
-        if await checkPrivateServerReachability() {
+        // Try private server first (use cached reachability if available)
+        if isPrivateServerReachable ?? true {
             do {
                 let relationships = try await fetchRelationshipsFromPrivateServer(mbid: mbid)
                 lastDataSource = .privateServer
@@ -150,12 +151,10 @@ actor MusicBrainzClient {
     // MARK: - Private Server Methods
 
     private func searchFromPrivateServer(query: String) async throws -> [Artist] {
-        // The private server proxies to MusicBrainz API
-        // Endpoint: /search?type=artist&query=...
+        // Direct MusicBrainz API format: /ws/2/artist?query=...
         var urlComponents = URLComponents(url: privateServerURL, resolvingAgainstBaseURL: false)!
-        urlComponents.path += "/search"
+        urlComponents.path = "/ws/2/artist"
         urlComponents.queryItems = [
-            URLQueryItem(name: "type", value: "artist"),
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "fmt", value: "json"),
             URLQueryItem(name: "limit", value: "25")
@@ -165,14 +164,17 @@ actor MusicBrainzClient {
             throw ClientError.invalidURL
         }
 
-        let (data, _) = try await session.data(from: url)
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        let (data, _) = try await session.data(for: request)
         let response = try JSONDecoder().decode(ArtistSearchResponse.self, from: data)
         return response.artists
     }
 
     private func fetchArtistFromPrivateServer(mbid: String) async throws -> Artist {
         var urlComponents = URLComponents(url: privateServerURL, resolvingAgainstBaseURL: false)!
-        urlComponents.path += "/artist/\(mbid)"
+        urlComponents.path = "/ws/2/artist/\(mbid)"
         urlComponents.queryItems = [
             URLQueryItem(name: "fmt", value: "json")
         ]
@@ -181,13 +183,19 @@ actor MusicBrainzClient {
             throw ClientError.invalidURL
         }
 
-        let (data, _) = try await session.data(from: url)
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        let (data, _) = try await session.data(for: request)
         return try JSONDecoder().decode(Artist.self, from: data)
     }
 
     private func fetchRelationshipsFromPrivateServer(mbid: String) async throws -> [Relationship] {
+        // Check for cancellation early
+        try Task.checkCancellation()
+
         var urlComponents = URLComponents(url: privateServerURL, resolvingAgainstBaseURL: false)!
-        urlComponents.path += "/artist/\(mbid)"
+        urlComponents.path = "/ws/2/artist/\(mbid)"
         urlComponents.queryItems = [
             URLQueryItem(name: "inc", value: "artist-rels"),
             URLQueryItem(name: "fmt", value: "json")
@@ -197,9 +205,20 @@ actor MusicBrainzClient {
             throw ClientError.invalidURL
         }
 
-        let (data, _) = try await session.data(from: url)
-        let response = try JSONDecoder().decode(ArtistRelationshipsResponse.self, from: data)
-        return parseRelationships(from: response, sourceArtistId: mbid)
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 30
+
+        // Check for cancellation before network request
+        try Task.checkCancellation()
+
+        let (data, _) = try await session.data(for: request)
+
+        // Check for cancellation after network request
+        try Task.checkCancellation()
+
+        let decoded = try JSONDecoder().decode(ArtistRelationshipsResponse.self, from: data)
+        return parseRelationships(from: decoded, sourceArtistId: mbid)
     }
 
     // MARK: - Public API Methods
@@ -289,10 +308,20 @@ actor MusicBrainzClient {
             return cached
         }
 
-        // Ping health endpoint
-        let healthURL = privateServerURL.appendingPathComponent("health")
+        // Try a simple artist lookup to test connectivity
+        // MusicBrainz API doesn't have a /health endpoint
+        guard let testURL = URL(string: "http://stonefrog-db01.stonefrog.com:5000/ws/2/artist/5b11f4ce-a62d-471e-81fc-a69a8278c7da?fmt=json") else {
+            isPrivateServerReachable = false
+            lastReachabilityCheck = Date()
+            return false
+        }
+
+        var request = URLRequest(url: testURL)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 3 // Quick timeout for reachability check
+
         do {
-            let (_, response) = try await session.data(from: healthURL)
+            let (_, response) = try await session.data(for: request)
             let isReachable = (response as? HTTPURLResponse)?.statusCode == 200
             isPrivateServerReachable = isReachable
             lastReachabilityCheck = Date()
